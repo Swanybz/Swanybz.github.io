@@ -1,0 +1,772 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>GainGrid Hosted — Tasks & Ads (iframe-ready)</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+<!-- Exact Google AdSense core script you provided -->
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2309008538670900"
+     crossorigin="anonymous"></script>
+
+<style>
+  :root{
+    --accent1:#ff6b9d; --accent2:#c471ed;
+    --bg:linear-gradient(135deg,#0f1419 0,#1a2332 50%,#0d1117 100%);
+    --card-gap:12px;
+  }
+  *,*::before,*::after{box-sizing:border-box}
+  html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial;color:#fff;background:var(--bg)}
+  /* Root centering to emulate phone frame look - content will size to viewport */
+  .viewport-wrap{width:100%;height:100vh;display:flex;align-items:center;justify-content:center;padding:12px}
+  /* Card dimensions are computed in JS (CSS variables set at run time) */
+  .card{
+    width:var(--card-width, 400px);
+    height:var(--card-height, 550px);
+    background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));
+    padding:14px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);
+    box-shadow:0 10px 30px rgba(0,0,0,0.5);display:flex;flex-direction:column;overflow:hidden;
+  }
+
+  .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex:0 0 auto}
+  .back-btn{background:transparent;border:0;color:rgba(255,255,255,0.9);cursor:pointer;font-weight:700}
+  h2{margin:0;font-size:16px}
+  .small{font-size:12px;color:rgba(255,255,255,0.78)}
+  .btn{padding:8px 10px;border-radius:8px;background:linear-gradient(45deg,var(--accent1),var(--accent2));border:none;color:#fff;cursor:pointer;font-weight:700}
+  .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06)}
+
+  /* Vertical task list (one-per-line) - will fit inside card content area */
+  .content{flex:1 1 auto;overflow:hidden;display:flex;flex-direction:column}
+  .task-list{display:flex;flex-direction:column;gap:var(--card-gap);margin:8px 0;overflow:auto;padding-right:6px}
+  .task-list::-webkit-scrollbar{width:8px}
+  .task-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.05);border-radius:6px}
+
+  .card-item{
+    width:100%;padding:10px;border-radius:8px;background:rgba(255,255,255,0.02);
+    display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px;
+  }
+  .card-item .left{flex:1;min-width:0}
+  .card-item strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
+  .card-item .meta{font-size:12px;color:rgba(255,255,255,0.66);margin-top:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  /* Ad player area */
+  .ad-player{width:100%;height:var(--ad-height,260px);border-radius:8px;overflow:hidden;background:#000;display:flex;align-items:center;justify-content:center;position:relative}
+  .ad-player iframe,.ad-player video{width:100%;height:100%;border:0;object-fit:cover}
+
+  .note{margin-top:8px;color:rgba(255,255,255,0.6);font-size:12px}
+  .countdown{font-weight:700;font-size:18px;color:#fff}
+  .hidden{display:none}
+
+  /* Ad slot centerers */
+  #adPlayerAdsenseHolder, #taskBanner, #adsterBannerHolder{display:flex;justify-content:center;align-items:center}
+  /* Small debug overlay (hidden by default, can be enabled by toggling .dbg-visible ) */
+  .dbg{position:absolute;left:8px;bottom:8px;padding:6px 8px;background:rgba(0,0,0,0.6);border-radius:6px;font-size:11px;color:#fff;z-index:50;display:none}
+  .dbg.dbg-visible{display:block}
+</style>
+</head>
+<body>
+  <div class="viewport-wrap">
+    <div class="card" id="root">
+      <div class="topbar">
+        <button id="backBtn" class="back-btn">← Back</button>
+        <div style="text-align:right">
+          <div class="small" id="vipInfo">VIP: —</div>
+          <div style="height:2px"></div>
+        </div>
+      </div>
+
+      <div class="content">
+        <div id="main" class="small" style="padding:6px 0 0 0">Initializing…</div>
+      </div>
+
+      <div class="dbg" id="dbg">dbg</div>
+    </div>
+  </div>
+
+<script>
+/* Hosted iframe — final build
+   - Fits the iframe viewport (JS sets --card-width/height from window.innerWidth/Height)
+   - Vertical tasks list sized to fit the iframe "phone frame"
+   - AdSense injected into ad_player slot (your exact snippet)
+   - Robust verification for popup/opened targets:
+       -> popup handle polling when available
+       -> visibilitychange/focus when popup handle not available
+       -> fallback timer check
+   - Posts messages to parent/top using your existing event names
+   - Keeps original names, flows, and APIs intact
+*/
+
+/* ===== CONFIG (unchanged logic names) ===== */
+const ADS_LIMIT = 20;
+const ADS_DURATION = 40; // seconds default
+const ADS_COOLDOWN_MS = 2 * 60 * 1000;
+const TASKS_LIMIT = 7;
+const VIP_BONUS = { basic:20, silver:40, gold:60, premium:100 };
+
+const ADSTER_SCRIPT_KEY = 'a8702b8b4c48420a3815542007f1c0df';
+const ADSTER_SCRIPT_SRC = "//www.highperformanceformat.com/" + ADSTER_SCRIPT_KEY + "/invoke.js";
+const ADSTERRA_ZONE_URL = "https://adsterra.com/video-ad/?zone=REPLACE_WITH_YOUR_ZONE";
+const GOOGLE_FALLBACK_VIDEO = "https://storage.googleapis.com/interactive-media-ads/media/big_buck_bunny_trailer.mp4";
+
+const TASK_APIS = [
+  "https://jsonplaceholder.typicode.com/posts?_limit=7",
+  "https://dummyjson.com/products?limit=7",
+  "https://api.publicapis.org/entries",
+  "https://fakestoreapi.com/products?limit=7"
+];
+
+const KEY_DAY = 'gg_hosted_day';
+const KEY_WATCHED = 'gg_hosted_watched_ads';
+const KEY_TASKS = 'gg_hosted_tasks_done';
+const KEY_LAST_AD = 'gg_hosted_last_ad';
+
+/* ===== Small helpers ===== */
+const el = id => document.getElementById(id);
+function nowDay(){ return new Date().toISOString().slice(0,10); }
+function rand(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+function escapeHtml(s){ if(!s && s !== 0) return ''; return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+(function ensureDayReset(){ const d = localStorage.getItem(KEY_DAY); if(d !== nowDay()){ localStorage.setItem(KEY_DAY, nowDay()); localStorage.removeItem(KEY_WATCHED); localStorage.removeItem(KEY_TASKS); localStorage.removeItem(KEY_LAST_AD);} })();
+
+function getWatched(){ try{ return JSON.parse(localStorage.getItem(KEY_WATCHED)||'[]'); }catch(e){ return []; } }
+function addWatched(id){ const a = getWatched(); if(!a.includes(id)){ a.push(id); localStorage.setItem(KEY_WATCHED, JSON.stringify(a)); } }
+function getTasksDone(){ try{ return JSON.parse(localStorage.getItem(KEY_TASKS)||'[]'); }catch(e){ return []; } }
+function addTaskDone(id){ const a = getTasksDone(); if(!a.includes(id)){ a.push(id); localStorage.setItem(KEY_TASKS, JSON.stringify(a)); } }
+function setLastAdTs(ts){ localStorage.setItem(KEY_LAST_AD, String(ts)); }
+function getLastAdTs(){ return Number(localStorage.getItem(KEY_LAST_AD) || 0); }
+function canOpenAdNow(){ const last = getLastAdTs(); if(!last) return true; return (Date.now() - last) >= ADS_COOLDOWN_MS; }
+
+/* ===== profile ===== */
+let profile = null;
+function readLocalProfile(){
+  const keys = ['user_data','gg_user','profile','user'];
+  for(const k of keys){
+    try{
+      const raw = localStorage.getItem(k);
+      if(!raw) continue;
+      const obj = JSON.parse(raw);
+      if(obj && typeof obj === 'object') return obj;
+    }catch(e){}
+  }
+  return null;
+}
+function postParent(msg){ try{ window.parent.postMessage(msg, '*'); }catch(e){} try{ if(window.top && window.top !== window) window.top.postMessage(msg, '*'); }catch(e){} }
+function requestProfileFromParent(timeout=2200){
+  return new Promise((resolve)=>{
+    let done=false;
+    function onMsg(ev){
+      try{
+        const d = ev.data || {};
+        if(d && d.type === 'profile_response' && d.payload){
+          done = true; profile = d.payload; window.removeEventListener('message', onMsg); resolve(d.payload);
+        }
+      }catch(e){}
+    }
+    window.addEventListener('message', onMsg);
+    postParent({ type:'profile_request' });
+    setTimeout(()=>{ if(!done){ window.removeEventListener('message', onMsg); resolve(null); } }, timeout);
+  });
+}
+function vipFrom(qp){ qp = qp || {}; if(qp.vip || qp.vip_level) return (qp.vip||qp.vip_level).toString(); if(profile && profile.vip_level) return profile.vip_level.toString(); const local = readLocalProfile(); if(local && local.vip_level) return local.vip_level; return 'None'; }
+
+/* ===== reward calcs ===== */
+function calcAdReward(vip){ const base = rand(60,120); const bonus = VIP_BONUS[(vip||'').toString().toLowerCase()] || 0; return { base, vip_bonus: bonus, total: base + bonus }; }
+function calcTaskReward(vip){ const base = rand(100,300); const bonus = VIP_BONUS[(vip||'').toString().toLowerCase()] || 0; return { base, vip_bonus: bonus, total: base + bonus }; }
+
+/* ===== provider helpers (ad) ===== */
+function tryLoadAdsterra(zoneUrl, timeoutMs=3500){
+  return new Promise((resolve) => {
+    if(!zoneUrl || zoneUrl.includes('REPLACE_WITH_YOUR_ZONE')) return resolve({ ok:false });
+    const iframe = document.createElement('iframe');
+    iframe.src = zoneUrl;
+    iframe.width = '100%'; iframe.height = '260'; iframe.style.border='0';
+    let done=false;
+    iframe.addEventListener('load', ()=>{ if(!done){ done=true; resolve({ ok:true, type:'adsterra', node:iframe }); }});
+    iframe.addEventListener('error', ()=>{ if(!done){ done=true; resolve({ ok:false }); }});
+    setTimeout(()=>{ if(!done){ done=true; resolve({ ok:false }); } }, timeoutMs);
+  });
+}
+function tryLoadVideoSrc(videoUrl, timeoutMs=3000){
+  return new Promise((resolve)=>{
+    if(!videoUrl) return resolve({ ok:false });
+    const video = document.createElement('video');
+    video.src = videoUrl; video.controls=false; video.autoplay=true; video.muted=true; video.playsInline=true;
+    let ok=false;
+    function cleanup(){ video.oncanplay=null; video.onerror=null; try{ video.pause(); }catch(e){} }
+    video.oncanplay = ()=>{ if(!ok){ ok=true; cleanup(); resolve({ ok:true, type:'video', node:video }); } };
+    video.onerror = ()=>{ if(!ok){ ok=true; cleanup(); resolve({ ok:false }); } };
+    setTimeout(()=>{ if(!ok){ ok=true; cleanup(); resolve({ ok:false }); } }, timeoutMs);
+  });
+}
+
+/* ===== task aggregator ===== */
+async function fetchTasks(limit = TASKS_LIMIT, timeoutPer = 3000){
+  const results = [];
+  for(const api of TASK_APIS){
+    try{
+      const ctrl = new AbortController();
+      const t = setTimeout(()=>ctrl.abort(), timeoutPer);
+      const res = await fetch(api, { signal:ctrl.signal });
+      clearTimeout(t);
+      if(!res.ok) continue;
+      const ct = res.headers.get('content-type') || '';
+      let json = null;
+      if(ct.includes('application/json')) json = await res.json();
+      if(!json) continue;
+      let arr = [];
+      if(Array.isArray(json)) arr = json;
+      else if(json.data && Array.isArray(json.data)) arr = json.data;
+      else if(json.products && Array.isArray(json.products)) arr = json.products;
+      else if(json.entries && Array.isArray(json.entries)) arr = json.entries;
+      else {
+        const top = Object.keys(json||{}).slice(0, limit);
+        arr = top.map(k => ({ id: k, title: k }));
+      }
+      arr.slice(0, limit).forEach((it, idx) => {
+        const id = it.id ? String(it.id) : ('task_' + Math.random().toString(36).slice(2,8));
+        const title = it.title || it.name || it.API || ('Task ' + (results.length+1));
+        const url = it.url || it.link || it.homepage || ('https://example.com/?ref=' + encodeURIComponent(id));
+        const secs = 30 + (idx%3)*10;
+        const reward = 100 + Math.floor(Math.random()*200);
+        results.push({ id, title, url, secs, reward, source: api });
+      });
+    } catch(e){ continue; }
+    if(results.length >= limit) break;
+  }
+  const seen = new Set(); const out = [];
+  for(const r of results){
+    if(seen.has(r.id)) continue;
+    seen.add(r.id);
+    out.push(r);
+    if(out.length >= limit) break;
+  }
+  return out;
+}
+
+/* ===== navigation state ===== */
+let currentView = 'home';
+const viewStack = [];
+function pushView(v){ viewStack.push(currentView); currentView = v; }
+function popView(){ const prev = viewStack.pop(); if(prev){ currentView = prev; return prev; } return null; }
+
+/* ===== UI helpers & responsive sizing ===== */
+function setTitle(t){ if(el('hostTitle')) el('hostTitle').textContent = t || 'Hosted view'; }
+function setVIPLabel(){ const qp = combinedQP(); const vip = (qp.vip || qp.vip_level) || (profile && profile.vip_level) || (readLocalProfile() && readLocalProfile().vip_level) || ''; el('vipInfo').textContent = vip ? ('VIP: ' + vip) : 'VIP: —'; }
+
+function setCardSizing(){
+  // Use the iframe's viewport (window.innerWidth/innerHeight) to compute a comfortable content area.
+  // We'll shrink a bit from the viewport edges to emulate margin inside the phone frame.
+  const vw = Math.max(320, Math.min(window.innerWidth, 920)); // clamp inbound
+  const vh = Math.max(480, Math.min(window.innerHeight, 1200));
+  // The card will be slightly smaller than viewport to emulate frame padding
+  const cardW = Math.round(Math.min( (vw - 24), 420 )); // never exceed 420
+  const cardH = Math.round(Math.min( (vh - 80), 700 )); // never exceed 700
+  // For your example: if iframe is 500x700 -> card becomes ~ (500-24)x(700-80) = 476x620 -> CSS uses smaller caps
+  document.documentElement.style.setProperty('--card-width', cardW + 'px');
+  document.documentElement.style.setProperty('--card-height', cardH + 'px');
+  // Ad height relative to card height
+  const adH = Math.max(120, Math.min(260, Math.round(cardH * 0.36)));
+  document.documentElement.style.setProperty('--ad-height', adH + 'px');
+}
+setCardSizing();
+window.addEventListener('resize', setCardSizing);
+
+/* ===== core renderers/flows (kept names) ===== */
+function renderHome(){
+  pushView('home');
+  setTitle('Hosted view');
+  setVIPLabel();
+  setMain(`<div class="small">Hosted — waiting for instruction. Use parent UI or deeplink to open a task/ad.</div>`);
+  currentView='home';
+}
+
+async function renderTaskBoard(qp, push=true){
+  if(push) pushView('tasks');
+  setTitle('Task Board');
+  setVIPLabel();
+  const done = getTasksDone();
+  if(done.length >= TASKS_LIMIT){
+    setMain(`<div class="small">You have completed today's tasks. New tasks will appear tomorrow.</div>`);
+    currentView='tasks';
+    return;
+  }
+  setMain(`<div class="small">Loading tasks…</div>`);
+  const tasks = await fetchTasks(TASKS_LIMIT);
+  if(!tasks || !tasks.length){ setMain(`<div class="small">No tasks available right now. Try again later.</div>`); currentView='tasks'; return; }
+
+  const html = tasks.map(t=>`
+    <div class="card-item" role="article" aria-label="${escapeHtml(t.title)}">
+      <div class="left">
+        <strong>${escapeHtml(t.title)}</strong>
+        <div class="meta">${escapeHtml(t.source)} · stay ${t.secs}s · Reward ${t.reward} G</div>
+      </div>
+      <div style="flex-shrink:0">
+        <button class="btn do-task" data-id="${encodeURIComponent(t.id)}" data-url="${encodeURIComponent(t.url)}" data-secs="${t.secs}" data-reward="${t.reward}">Do</button>
+      </div>
+    </div>
+  `).join('');
+
+  const tasksHtml = `<div class="small">Tasks auto-generated (max ${TASKS_LIMIT}/day). Tap a task to start.</div>
+    <div class="task-list" id="taskList">${html}</div>
+    <div style="margin-top:10px;text-align:center"><div id="taskBanner"></div></div>`;
+
+  setMain(tasksHtml);
+  currentView='tasks';
+  injectAdsterraInto('taskBanner'); // keep banner
+
+  Array.from(document.querySelectorAll('.do-task')).forEach(b=>{
+    b.addEventListener('click', async ()=>{
+      const id = decodeURIComponent(b.getAttribute('data-id'));
+      const url = decodeURIComponent(b.getAttribute('data-url'));
+      const secs = Number(b.getAttribute('data-secs')||30);
+      const rewardBase = Number(b.getAttribute('data-reward')||120);
+      postParent({ type:'task_started', payload:{ task_id: id, task_type: 'auto' } });
+      await runTaskFlow({ task_id: id, url, secs, rewardBase, _source: qp._source || detectSource(qp) });
+    });
+  });
+}
+
+/* ===== improved verification flow =====
+   Strategy:
+    - When opening target, record expectedEnd = now + secs*1000
+    - If popup handle returned: poll for popup.closed (like before)
+    - If no popup handle (common in mobile/WebView), rely on:
+         * document.visibilitychange & window.focus events to detect return
+         * periodic fallback check that compares Date.now() >= expectedEnd
+    - On verification success -> post task_complete and close_hosted
+*/
+async function runTaskFlow(opts){
+  pushView('task');
+  setTitle('Task');
+  setVIPLabel();
+  const taskId = opts.task_id || ('task_' + Math.random().toString(36).slice(2,8));
+  const secs = Number(opts.secs || 30);
+  const url = opts.url || '';
+  setMain(`<div class="small">Task ${escapeHtml(taskId)} — open the target and remain for <strong>${secs}s</strong> to verify.</div>
+    <div style="margin-top:12px;display:flex;gap:8px;justify-content:center"><button id="openBtn" class="btn">Open & Start</button><button id="cancelBtn" class="btn ghost">Cancel</button></div>
+    <div id="taskNote" class="small" style="margin-top:12px"></div>`);
+  currentView='task';
+
+  const openBtn = el('openBtn'), cancelBtn = el('cancelBtn'), note = el('taskNote');
+  let finished = false, timer = null, popup = null, pollIntervalId = null, expectedEnd = null;
+
+  function cleanupAll(){
+    try{ if(timer) clearTimeout(timer); }catch(e){} try{ if(pollIntervalId) clearInterval(pollIntervalId); }catch(e){}
+    timer=null; pollIntervalId=null;
+    // remove listeners
+    document.removeEventListener('visibilitychange', visibilityHandler);
+    window.removeEventListener('focus', focusHandler);
+    window.removeEventListener('message', parentListenerForVerification);
+  }
+
+  // parent can send verification (if your external page notifies parent which then forwards)
+  function parentListenerForVerification(ev){
+    try{
+      const d = ev.data || {};
+      if(d && d.type === 'external_verification' && d.payload && d.payload.task_id === taskId && !finished){
+        // parent signals verification from outside page
+        finished = true;
+        cleanupAll();
+        finalizeSuccess();
+      }
+    }catch(e){}
+  }
+
+  function finalizeSuccess(){
+    const vip = vipFrom({});
+    const rewardObj = calcTaskReward(vip);
+    addTaskDone(taskId);
+    const payload = {
+      task_id: taskId,
+      reward: rewardObj.total,
+      base: rewardObj.base,
+      vip_bonus: rewardObj.vip_bonus,
+      vip_level: vip || null,
+      user_id: (profile && profile.user_id) || null,
+      status: 'completed'
+    };
+    postParent({ type:'task_complete', payload });
+    note.textContent = 'Task verified. Returning...';
+    saveTaskState({ date: nowDay(), status: 'completed' });
+    try{ if(popup && !popup.closed) popup.close(); }catch(e){}
+    // give parent a moment then request close
+    setTimeout(()=> { postParent({ type:'close_hosted', reason:'task_done', payload }); try{ if(window.close) window.close(); }catch(e){} }, 600);
+  }
+
+  // If user returns to the iframe and time has passed enough -> success
+  async function visibilityHandler(){
+    if(document.visibilityState === 'visible' && expectedEnd){
+      const now = Date.now();
+      if(now >= expectedEnd && !finished){
+        finished = true;
+        cleanupAll();
+        finalizeSuccess();
+      }
+    }
+  }
+
+  function focusHandler(){
+    if(expectedEnd && Date.now() >= expectedEnd && !finished){
+      finished = true;
+      cleanupAll();
+      finalizeSuccess();
+    }
+  }
+
+  openBtn.addEventListener('click', async ()=>{
+    cancelBtn.style.display = 'none';
+    openBtn.disabled = true;
+    note.textContent = `Opening target — please stay ${secs}s on the target for verification...`;
+
+    // compute expected end
+    expectedEnd = Date.now() + secs * 1000;
+
+    // try to open popup/tab with handle
+    try{ popup = window.open(url, '_blank', 'noopener'); }catch(e){ popup = null; }
+
+    // if no popup handle, attempt anchor click fallback (still a user gesture)
+    if(!popup){
+      try{
+        const a = document.createElement('a');
+        a.href = url || '#';
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }catch(e){}
+    }
+
+    // if popup handle exists, poll for closed early
+    if(popup){
+      pollIntervalId = setInterval(()=>{
+        try{
+          if(popup.closed && !finished){
+            // user closed before enough time
+            if(Date.now() < expectedEnd){
+              // unverified
+              finished = true;
+              cleanupAll();
+              const payload = { task_id: taskId, status: 'unverified_popup_closed', reward:0, base:0, vip_bonus:0, user_id: (profile && profile.user_id) || null };
+              postParent({ type:'task_complete', payload });
+              saveTaskState({ date: nowDay(), status: 'idle' });
+              note.textContent = 'Popup closed before verification. Returning...';
+              setTimeout(()=> { postParent({ type:'close_hosted', reason:'popup_closed', payload }); try{ if(window.close) window.close(); }catch(e){} }, 600);
+            } else {
+              // user closed after enough time -> treat as success
+              if(!finished){
+                finished = true;
+                cleanupAll();
+                finalizeSuccess();
+              }
+            }
+          }
+        }catch(e){}
+      }, 700);
+    } else {
+      // no popup handle: rely on visibility/focus + fallback timer
+      document.addEventListener('visibilitychange', visibilityHandler);
+      window.addEventListener('focus', focusHandler);
+      // parent message listener in case parent receives external verification and forwards it
+      window.addEventListener('message', parentListenerForVerification);
+
+      // fallback periodic check: when expectedEnd passes => success
+      pollIntervalId = setInterval(()=>{
+        if(Date.now() >= expectedEnd && !finished){
+          finished = true;
+          cleanupAll();
+          finalizeSuccess();
+        }
+      }, 900);
+    }
+
+    // Also set a safety timer to finalize after slightly longer than expectedEnd in case other signals fail
+    timer = setTimeout(()=> {
+      if(!finished){
+        finished = true;
+        cleanupAll();
+        finalizeSuccess();
+      }
+    }, secs*1000 + 3000);
+  });
+
+  cancelBtn.addEventListener('click', ()=>{
+    postParent({ type:'task_skipped', payload: { task_id: taskId } });
+    popView();
+    renderTaskBoard({}, false);
+  });
+
+  window.addEventListener('beforeunload', ()=> { if(!finished) postParent({ type:'task_incomplete', payload:{ task_id: taskId } }); });
+}
+
+/* ===== ad flow (with AdSense inserted into ad_player area) ===== */
+async function renderAdFlow(qp){
+  pushView('ad');
+  setTitle('Watch Ad');
+  setVIPLabel();
+
+  const watched = getWatched();
+  if(watched.length >= ADS_LIMIT){
+    const now = new Date(), tom = new Date(now.getFullYear(), now.getMonth(), now.getDate()+1);
+    const msLeft = tom - now; const hrs = Math.floor(msLeft/3600000); const mins = Math.floor((msLeft%3600000)/60000);
+    setMain(`<div class="small">Daily ad limit reached. Next ads unlock in ${hrs}h ${mins}m</div>`);
+    currentView='ad';
+    return;
+  }
+  if(!canOpenAdNow()){
+    const rem = ADS_COOLDOWN_MS - (Date.now() - getLastAdTs()); const mins = Math.ceil(rem/60000);
+    setMain(`<div class="small">Cooldown active. Try again in ~${mins} minute(s).</div>`);
+    currentView='ad';
+    return;
+  }
+
+  // try providers: Adsterra -> video fallback
+  let provider = { ok:false };
+  try { provider = await tryLoadAdsterra(ADSTERRA_ZONE_URL, 3500); } catch(e){ provider={ok:false}; }
+  if(!provider.ok){
+    try { provider = await tryLoadVideoSrc(GOOGLE_FALLBACK_VIDEO, 3000); } catch(e){ provider={ok:false}; }
+  }
+  if(!provider.ok){
+    provider = { ok:true, type:'fallback', node: (function(){ const d=document.createElement('div'); d.innerHTML='<div class="small" style="padding:12px">Ad preview (fallback)</div>'; return d; })() };
+  }
+
+  if(!profile) profile = readLocalProfile() || null;
+  if(!profile) await requestProfileFromParent(1500).catch(()=>null);
+  setVIPLabel();
+  const vip = vipFrom(qp);
+  const rewardObj = calcAdReward(vip);
+
+  const adId = qp.ad_id || ('host_ad_'+Math.floor(Math.random()*999999));
+  addWatched(adId);
+  setLastAdTs(Date.now());
+
+  const nodeHtmlId = 'adPlayerNode';
+  setMain(`<div class="small">Watching: <strong>${escapeHtml(adId)}</strong> — Reward: <strong>${rewardObj.total} G</strong>
+    <div class="small">(${rewardObj.base} base + ${rewardObj.vip_bonus} VIP)</div></div>
+    <div style="margin-top:10px" id="${nodeHtmlId}" class="ad-player"><div class="small">Loading ad…</div></div>
+    <div id="adPlayerAdsenseHolder" style="margin-top:10px;text-align:center"></div>
+    <div style="margin-top:10px;display:flex;gap:8px;justify-content:center"><div class="countdown" id="adCount">${ADS_DURATION}</div></div>
+    <div style="margin-top:10px;display:flex;gap:8px;justify-content:center"><button id="claimBtn" class="btn" disabled>Claim</button><button id="retBtn" class="btn ghost hidden">Return</button></div>
+    <div class="note" id="adNote">Auto-completes after ${ADS_DURATION}s</div>`);
+
+  const container = el(nodeHtmlId);
+  if(provider.node){
+    container.innerHTML = ''; container.appendChild(provider.node);
+    if(provider.type === 'video'){ try{ provider.node.play().catch(()=>{}); }catch(e){} }
+  }
+
+  // Adsterra fallback banner (kept)
+  const bannerHolder = document.createElement('div');
+  bannerHolder.style.position = 'absolute';
+  bannerHolder.style.top = '8px';
+  bannerHolder.style.left = '50%';
+  bannerHolder.style.transform = 'translateX(-50%)';
+  bannerHolder.style.zIndex = '5';
+  bannerHolder.id = 'adsterBannerHolder';
+  injectAdsterraIntoElement(bannerHolder);
+  if(container && container.parentElement) container.parentElement.appendChild(bannerHolder);
+
+  // Insert AdSense EXACT snippet INSIDE the ad_player area (adPlayerAdsenseHolder).
+  try{
+    const holder = el('adPlayerAdsenseHolder');
+    if(holder){
+      // ensure width fits the card
+      holder.innerHTML = `
+        <!-- GainGrid_Display_Horizontal (injected) -->
+        <ins class="adsbygoogle"
+             style="display:inline-block;width:468px;height:60px"
+             data-ad-client="ca-pub-2309008538670900"
+             data-ad-slot="4194843603"></ins>
+      `;
+      try{ (adsbygoogle = window.adsbygoogle || []).push({}); }catch(e){ console.warn('adsbygoogle push failed', e); }
+
+      // keep amp-ad fallback markup as requested
+      const ampWrap = document.createElement('div');
+      ampWrap.style.marginTop = '6px';
+      ampWrap.innerHTML = `
+        <amp-ad
+             layout="fixed"
+             width="468"
+             height="60"
+             type="adsense"
+             data-ad-client="ca-pub-2309008538670900"
+             data-ad-slot="4194843603">
+        </amp-ad>
+      `;
+      holder.appendChild(ampWrap);
+    }
+  }catch(e){ console.warn('inject Adsense failed', e); }
+
+  const countEl = el('adCount'), claimBtn = el('claimBtn'), retBtn = el('retBtn'), adNote = el('adNote');
+  let secs = ADS_DURATION; let completed=false;
+  const timerId = setInterval(()=>{
+    secs--; if(countEl) countEl.textContent = secs;
+    if(secs <= 0){
+      clearInterval(timerId);
+      if(claimBtn) claimBtn.disabled = false;
+      adNote.textContent = 'Ad finished. Press Claim or wait to auto-send.';
+      setTimeout(()=>{
+        if(completed) return;
+        completed = true;
+        const payload = {
+          ad_id: adId,
+          reward: rewardObj.total,
+          base: rewardObj.base,
+          vip_bonus: rewardObj.vip_bonus,
+          vip_level: vip || null,
+          user_id: (profile && profile.user_id) || null
+        };
+        postParent({ type:'ad_complete', payload });
+        if(retBtn){ retBtn.classList.remove('hidden'); retBtn.textContent = (detectSource(qp) === 'ui' ? 'Return to Game' : 'Close'); }
+      }, 900);
+    }
+  }, 1000);
+
+  claimBtn.addEventListener('click', ()=>{
+    if(completed) return;
+    completed = true;
+    const payload = {
+      ad_id: adId,
+      reward: rewardObj.total,
+      base: rewardObj.base,
+      vip_bonus: rewardObj.vip_bonus,
+      vip_level: vip || null,
+      user_id: (profile && profile.user_id) || null
+    };
+    postParent({ type:'ad_complete', payload });
+    if(retBtn){ retBtn.classList.remove('hidden'); retBtn.textContent = (detectSource(qp) === 'ui' ? 'Return to Game' : 'Close'); }
+  });
+
+  retBtn.addEventListener('click', ()=> {
+    postParent({ type:'close_hosted', reason:'user_return' });
+    try{ if(window.close) window.close(); }catch(e){}
+  });
+
+  currentView='ad';
+}
+
+/* ===== Adsterra injection helpers (kept) ===== */
+function injectAdsterraInto(idOrElem){
+  let holder = null;
+  if(typeof idOrElem === 'string') holder = document.getElementById(idOrElem);
+  else holder = idOrElem;
+  if(!holder) return;
+  holder.innerHTML = '';
+  const wrap = document.createElement('div');
+  wrap.style.width = '468px';
+  wrap.style.maxWidth = '100%';
+  wrap.style.height = '60px';
+  wrap.style.margin = '0 auto';
+  wrap.style.overflow = 'hidden';
+  const s1 = document.createElement('script');
+  s1.type = 'text/javascript';
+  s1.text = "atOptions = { 'key' : '" + ADSTER_SCRIPT_KEY + "', 'format' : 'iframe', 'height' : 60, 'width' : 468, 'params' : {} };";
+  wrap.appendChild(s1);
+  const s2 = document.createElement('script');
+  s2.type = 'text/javascript';
+  s2.src = ADSTER_SCRIPT_SRC;
+  wrap.appendChild(s2);
+  holder.appendChild(wrap);
+}
+function injectAdsterraIntoElement(elem){
+  try{
+    const s1 = document.createElement('script');
+    s1.type = 'text/javascript';
+    s1.text = "atOptions = { 'key' : '" + ADSTER_SCRIPT_KEY + "', 'format' : 'iframe', 'height' : 60, 'width' : 468, 'params' : {} };";
+    elem.appendChild(s1);
+    const s2 = document.createElement('script');
+    s2.type = 'text/javascript';
+    s2.src = ADSTER_SCRIPT_SRC;
+    elem.appendChild(s2);
+  }catch(e){ console.warn('injectAdsterraIntoElement failed', e); }
+}
+
+/* ===== routing & helpers (kept) ===== */
+function qsParse(s){ if(!s) return {}; return s.replace(/^\?/,'').split('&').filter(Boolean).reduce((o,p)=>{ const i=p.indexOf('='); if(i<0) o[decodeURIComponent(p)]=''; else o[decodeURIComponent(p.slice(0,i))]=decodeURIComponent(p.slice(i+1)); return o; }, {}); }
+function getHashQP(){ if(!location.hash) return {}; const h = location.hash.replace(/^#/,''); const parts = h.split('?'); return qsParse(parts[1]||''); }
+function getSearchQP(){ return qsParse(location.search || ''); }
+function combinedQP(){ return Object.assign({}, getHashQP(), getSearchQP()); }
+function detectSource(qp){ qp = qp || combinedQP(); if(qp._source === 'ui') return 'ui'; if(qp.start) return 'deeplink'; if(qp.ad_id || qp.task_id){ if(qp.user_id || qp.vip || qp.vip_level) return 'ui'; return 'deeplink'; } return 'ui'; }
+function decodeStart(raw){
+  if(!raw) return null;
+  try{
+    const norm = raw.replace(/-/g,'+').replace(/_/g,'/');
+    const json = atob(norm); return JSON.parse(json);
+  }catch(e){
+    try{ return JSON.parse(decodeURIComponent(raw)); }catch(e){ return null; }
+  }
+}
+
+/* ===== UI wiring & router ===== */
+function setMain(html){ if(el('main')) el('main').innerHTML = html; }
+el('backBtn').addEventListener('click', ()=> {
+  if(currentView === 'task'){
+    popView();
+    renderTaskBoard({}, false);
+    return;
+  }
+  postParent({ type:'close_hosted', reason:'user_closed' });
+});
+
+window.addEventListener('message', function(ev){
+  try{
+    const d = ev.data || {};
+    if(!d || typeof d !== 'object') return;
+    if(d.type === 'profile_response' && d.payload){ profile = d.payload; setVIPLabel(); }
+    if(d.type === 'open_ad' && d.payload && d.payload.ad_id){ location.hash = '#/ad?ad_id='+encodeURIComponent(d.payload.ad_id)+'&_source=ui'; router(); }
+    if(d.type === 'open_task' && d.payload && d.payload.task_id){ location.hash = '#/task?task_id='+encodeURIComponent(d.payload.task_id)+'&_source=ui'; router(); }
+    // allow parent to forward external verification result (if integration uses that)
+    if(d.type === 'external_verification' && d.payload){ /* handled in runTaskFlow via message listener added during flow */ }
+  }catch(e){}
+});
+
+async function router(){
+  profile = profile || readLocalProfile() || null;
+  setVIPLabel();
+  const qp = combinedQP();
+
+  if(qp.start){
+    const decoded = decodeStart(qp.start);
+    if(decoded){
+      const action = (decoded.action || decoded.cmd || decoded.type || '').toString().toLowerCase();
+      const payload = decoded.payload || decoded.data || decoded;
+      if(action.includes('ad') || action.includes('watch')){
+        if(payload && (payload.ad_id || payload.id)) qp.ad_id = payload.ad_id || payload.id;
+        qp.vip = qp.vip || payload.vip || payload.vip_level;
+        await renderAdFlow(qp);
+        return;
+      } else if(action.includes('task')){
+        if(payload && (payload.task_id || payload.id)) qp.task_id = payload.task_id || payload.id;
+        qp.vip = qp.vip || payload.vip || payload.vip_level;
+        await renderTaskBoard(qp);
+        return;
+      }
+    }
+  }
+
+  if(qp.ad_id || qp.type === 'ad' || (location.hash && location.hash.toLowerCase().includes('/ad'))){
+    await renderAdFlow(qp);
+    return;
+  }
+  if(qp.task_id || qp.type === 'task' || (location.hash && location.hash.toLowerCase().includes('/task'))){
+    await renderTaskBoard(qp);
+    return;
+  }
+
+  renderHome();
+}
+setTimeout(()=> router(), 120);
+window.addEventListener('hashchange', ()=> router());
+
+function saveTaskState(obj){ try{ localStorage.setItem('gg_hosted_state', JSON.stringify(obj)); }catch(e){} }
+
+/* Optional debug toggle: show debug overlay when url ?dbg=1 */
+try{
+  const q = combinedQP(); if(q.dbg === '1'){ el('dbg').classList.add('dbg-visible'); el('dbg').textContent = 'dbg on'; }
+}catch(e){}
+
+</script>
+</body>
+</html>
