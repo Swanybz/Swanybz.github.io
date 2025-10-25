@@ -41,7 +41,6 @@
   #adPlayerAdsenseHolder, #taskBanner, #adsterBannerHolder{display:flex;justify-content:center;align-items:center}
   .dbg{position:absolute;left:8px;bottom:8px;padding:6px 8px;background:rgba(0,0,0,0.6);border-radius:6px;font-size:11px;color:#fff;z-index:50;display:none}
   .dbg.dbg-visible{display:block}
-  /* ADDED: small verified badge style */
   .gaingrid-verified{color:lightgreen;margin-top:6px;font-weight:600;font-size:12px}
 </style>
 </head>
@@ -64,14 +63,118 @@
   </div>
 
 <script>
-/* Your original hosted iframe — with small, surgical fixes:
-   - Accepts parent start_payload.tasks and renders them immediately
-   - Prefers authoritative secs/reward parent sent when running tasks/ads
-   - Removes completed task from PARENT_TASKS and localStorage
-   - Keeps AdSense and Adsterra injections, daily ad generation, cooldowns, and UI unchanged
-   - Posts hosted_ready on load (already present)
-   - DOES NOT rename or remove your existing functions/variables
-*/
+/* ============================
+   FULL HOSTED HTML (final)
+   - Early message queue & safe processing (ADDED)
+   - Authoritative parent payload handling (tasks & ads)
+   - Randomized daily ads (30/40/50/60) + VIP rewards
+   - AdSense + Adsterra injection (kept)
+   - Preserves all original names, UI, logic
+   ============================ */
+
+/* ===== EARLY QUEUE: make sure we never drop a start_payload ===== */
+/* ADDED */
+window.__HOSTED_INCOMING_QUEUE = window.__HOSTED_INCOMING_QUEUE || [];
+window.__HOSTED_IS_READY = false;
+
+window.addEventListener('message', function __earlyHostQueue(ev){
+  try{
+    const d = ev && ev.data;
+    if(!d || typeof d !== 'object') return;
+
+    // quick ping reply
+    if(d.type === 'ping_hosted'){
+      try{ (ev.source && ev.source.postMessage) && ev.source.postMessage({ type: 'hosted_pong', payload:{ ts: Date.now() } }, '*'); }catch(e){}
+      return;
+    }
+
+    if(d.type === 'start_payload' || d.type === 'open_task' || d.type === 'open_ad'){
+      // normalize
+      let normalized = { type:'start_payload', payload: {} };
+      if(d.type === 'start_payload'){ normalized = d; }
+      else { normalized.payload = d.payload || d; }
+
+      if(!window.__HOSTED_IS_READY){
+        window.__HOSTED_INCOMING_QUEUE.push(normalized);
+        try{ if(window.__hostedDebug) window.__hostedDebug('queued:'+ (normalized.payload && (normalized.payload.id||normalized.payload.task_id||'p')) ); }catch(e){}
+        return;
+      }
+
+      // ready -> process immediately
+      processStartPayload(normalized.payload);
+      return;
+    }
+
+    // queue other object messages when not ready
+    if(!window.__HOSTED_IS_READY){
+      window.__HOSTED_INCOMING_QUEUE.push(d);
+      return;
+    }
+
+  }catch(err){ console.warn('earlyHostQueue err', err); }
+}, false);
+
+/* helper to post to parent robustly (kept) */
+function postParent(msg){
+  try{ if(window.parent && window.parent !== window) window.parent.postMessage(msg, '*'); }catch(e){}
+  try{ if(window.opener && !window.opener.closed) window.opener.postMessage(msg, '*'); }catch(e){}
+  try{ console.log('postParent:', msg); }catch(e){}
+}
+
+/* process start payloads into existing handlers (ADDED) */
+function processStartPayload(p){
+  try{
+    if(!p) return;
+    // tasks array
+    if(Array.isArray(p.tasks) && p.tasks.length){
+      PARENT_TASKS = (p.tasks||[]).map(t=>Object.assign({}, t));
+      if(typeof renderTasksFromParent === 'function') renderTasksFromParent(PARENT_TASKS);
+      return;
+    }
+    // ad
+    if(p.ad_id || p.type === 'ad' || p.isAd){
+      if(typeof renderAdFlow === 'function'){
+        renderAdFlow({ ad_id: p.ad_id || p.id, secs: p.secs, reward: p.reward, vip: p.vip || p.vip_level });
+        return;
+      }
+      try{ location.hash = '#/ad?id='+encodeURIComponent(p.ad_id||p.id||'')+'&secs='+encodeURIComponent(p.secs||'')+'&reward='+encodeURIComponent(p.reward||''); if(typeof router==='function') router(); }catch(e){}
+      return;
+    }
+    // task
+    if(p.task_id || p.type === 'task' || p.isTask || p.id){
+      if(typeof awaitRunTaskFlowFromPayload === 'function'){
+        awaitRunTaskFlowFromPayload(p);
+        return;
+      }
+      PARENT_TASKS = PARENT_TASKS || [];
+      PARENT_TASKS.unshift(p);
+      if(typeof renderTasksFromParent === 'function') renderTasksFromParent(PARENT_TASKS);
+      return;
+    }
+
+    // fallback: push into PARENT_TASKS if looks like a task
+    if(p.id && p.title){
+      PARENT_TASKS = PARENT_TASKS || [];
+      PARENT_TASKS.unshift(p);
+      if(typeof renderTasksFromParent === 'function') renderTasksFromParent(PARENT_TASKS);
+    }
+  }catch(e){ console.warn('processStartPayload error', e); }
+}
+
+/* consume queued messages once ready (ADDED) */
+function _consumeQueuedMessages(){
+  try{
+    while(window.__HOSTED_INCOMING_QUEUE && window.__HOSTED_INCOMING_QUEUE.length){
+      const msg = window.__HOSTED_INCOMING_QUEUE.shift();
+      if(!msg) continue;
+      if(msg.type === 'start_payload'){
+        processStartPayload(msg.payload || {});
+      } else {
+        try{ window.dispatchEvent(new MessageEvent('message', { data: msg })); }catch(e){}
+      }
+    }
+  }catch(e){ console.warn('consume queue error', e); }
+}
 
 /* ===== CONFIG & constants (kept names) ===== */
 const ADS_LIMIT = 20;
@@ -111,13 +214,6 @@ function setCardSizing(){
   document.documentElement.style.setProperty('--ad-height', adH + 'px');
 }
 setCardSizing(); window.addEventListener('resize', setCardSizing);
-
-/* ===== postParent helper (robust) ===== */
-function postParent(msg){
-  try{ if(window.parent && window.parent !== window) window.parent.postMessage(msg, '*'); }catch(e){}
-  try{ if(window.opener && !window.opener.closed) window.opener.postMessage(msg, '*'); }catch(e){}
-  try{ console.log('postParent:', msg); }catch(e){}
-}
 
 /* ===== storage helpers & day reset ===== */
 (function ensureDayReset(){
@@ -161,15 +257,10 @@ function readLocalProfile(){
   return null;
 }
 function vipFrom(qp){ qp = qp || {}; if(qp.vip || qp.vip_level) return (qp.vip||qp.vip_level).toString(); if(profile && profile.vip_level) return profile.vip_level.toString(); const local = readLocalProfile(); if(local && local.vip_level) return local.vip_level; return 'None'; }
-function calcTaskReward(vip){ // keep as fallback but hosted will prefer authoritative reward from parent when provided
-  const base = rand(100, 300);
-  const bonus = VIP_BONUS[(vip||'').toString().toLowerCase()] || 0;
-  return { base, vip_bonus: bonus, total: base + bonus };
-}
+function calcTaskReward(vip){ const base = rand(100, 300); const bonus = VIP_BONUS[(vip||'').toString().toLowerCase()] || 0; return { base, vip_bonus: bonus, total: base + bonus }; }
 function calcAdRewardFromBase(base, vip){ const bonus = VIP_BONUS[(vip||'').toString().toLowerCase()] || 0; return { base, vip_bonus: bonus, total: base + bonus }; }
 
 /* ===== provider helpers (ad) ===== */
-/* (kept unchanged) */
 function tryLoadAdsterra(zoneUrl, timeoutMs=3500){
   return new Promise((resolve) => {
     if(!zoneUrl || zoneUrl.includes('REPLACE_WITH_YOUR_ZONE')) return resolve({ ok:false });
@@ -195,7 +286,7 @@ function tryLoadVideoSrc(videoUrl, timeoutMs=3000){
   });
 }
 
-/* ===== HOSTED: readiness handshake + debug overlay (kept) ===== */
+/* ===== HOSTED: readiness handshake + debug overlay (kept & improved) ===== */
 (function hostedReadyAndDebug(){
   try{
     if(!document.getElementById('hostedDbg')){
@@ -217,6 +308,10 @@ function tryLoadVideoSrc(videoUrl, timeoutMs=3000){
 
     function announceReady(){
       try{
+        // mark hosted side ready and flush queue (ADDED)
+        window.__HOSTED_IS_READY = true;
+        _consumeQueuedMessages(); // ADDED
+
         postParent({ type: 'hosted_ready', payload: { ts: Date.now() } });
         const d = document.getElementById('hostedDbg');
         if(d) d.textContent = 'hosted:ready';
@@ -239,7 +334,7 @@ function tryLoadVideoSrc(videoUrl, timeoutMs=3000){
   }catch(e){ console.warn('hostedReadyAndDebug init error', e); }
 })();
 
-/* ===== Ads generator: create daily ads with random secs, base scaled by time + vip (kept & robust) ===== */
+/* ===== Ads generator: create daily ads with random secs, base scaled by time + vip ===== */
 function generateDailyAds(){
   try {
     const today = new Date().toDateString();
@@ -329,19 +424,18 @@ function renderTasksFromParent(tasks){
   }
 }
 
-/* ===== UI renderers ===== */
+/* ===== UI helpers (kept) ===== */
+function setMain(html){ if(el('main')) el('main').innerHTML = html; }
 function setTitle(t){ if(el('hostTitle')) el('hostTitle').textContent = t || 'Hosted view'; }
 function setVIPLabel(){ const qp = combinedQP(); const vip = (qp.vip || qp.vip_level) || (profile && profile.vip_level) || (readLocalProfile() && readLocalProfile().vip_level) || ''; if(el('vipInfo')) el('vipInfo').textContent = vip ? ('VIP: ' + vip) : 'VIP: —'; }
 
-/* render task board (kept; will prefer PARENT_TASKS if present) */
+/* render task board (kept; prefer PARENT_TASKS if present) */
 async function renderTaskBoard(qp){
   setTitle('Task Board'); setVIPLabel();
-  // prefer authoritative parent tasks
   if(PARENT_TASKS && Array.isArray(PARENT_TASKS) && PARENT_TASKS.length){
     renderTasksFromParent(PARENT_TASKS);
     return;
   }
-
   const done = getTasksDone();
   if(done.length >= TASKS_LIMIT){ setMain(`<div class="small">You have completed today's tasks. New tasks will appear tomorrow.</div>`); return; }
   setMain(`<div class="small">Loading tasks…</div>`);
@@ -430,13 +524,11 @@ async function runTaskFlow(opts){
     note.textContent = 'Task verified. Returning...';
     saveTaskState && saveTaskState({ date: nowDay(), status: 'completed' });
 
-    // Close popup if open
+    // Close popup if open and cleanup parent tasks
     try{ if(popup && !popup.closed) popup.close(); }catch(e){}
-    // Remove this task from PARENT_TASKS (if present) and from local gg_hosted_tasks store
     try{
       if(PARENT_TASKS && Array.isArray(PARENT_TASKS)){
         PARENT_TASKS = PARENT_TASKS.filter(t => (t.id || t.task_id) !== taskId);
-        // update DOM quickly
         const elList = document.getElementById('taskList');
         if(elList){
           Array.from(elList.querySelectorAll('.card-item')).forEach(c => {
@@ -716,10 +808,6 @@ function decodeStart(raw){
   }
 }
 
-el('backBtn').addEventListener('click', ()=> {
-  postParent({ type:'close_hosted', reason:'user_closed' });
-});
-
 /* parent message handler: receive profile, open commands, parent-provided tasks, or forwarded verifications */
 window.addEventListener('message', function(ev){
   try{
@@ -731,12 +819,10 @@ window.addEventListener('message', function(ev){
 
     if(d.type === 'profile_response' && d.payload){ profile = d.payload; setVIPLabel(); }
 
-    // ADDED: accept authoritative tasks array from parent
+    // Accept authoritative tasks array from parent (legacy compatibility)
     if(d.type === 'start_payload' && d.payload){
       const p = d.payload;
-      // if tasks array provided -> render them authoritatively
       if(Array.isArray(p.tasks) && p.tasks.length){
-        // normalize and render
         const mapped = p.tasks.map(t => ({
           id: t.id || t.task_id || ('task_' + Math.random().toString(36).slice(2,8)),
           title: t.title || t.name || ('Task ' + (t.id||'')),
@@ -750,23 +836,17 @@ window.addEventListener('message', function(ev){
         return;
       }
 
-      // if single authoritative ad/task payload
       if(p && (p.ad_id || p.task_id || p.id)){
-        // set a local incoming object and choose flow
         const incoming = Object.assign({}, p, { from: 'ui' });
-        // If it's an ad payload, render ad flow using incoming values
         if(p.ad_id || p.type === 'ad' || p.isAd){
           renderAdFlow({ ad_id: p.ad_id || p.id, secs: p.secs, reward: p.reward, vip: p.vip, vip_level: p.vip_level });
           return;
         }
-        // If it's task payload, directly render task board focused on that task
         if(p.task_id || p.type === 'task' || p.isTask){
-          // prefer parent tasks when present, otherwise navigate into task
           if(PARENT_TASKS && PARENT_TASKS.length){
             renderTasksFromParent(PARENT_TASKS);
             return;
           } else {
-            // open single task view by running runTaskFlow with provided authoritative values
             awaitRunTaskFlowFromPayload(p);
             return;
           }
@@ -795,7 +875,6 @@ function awaitRunTaskFlowFromPayload(p){
     const secs = Number(p.secs || p.duration || 30);
     const reward = Number(p.reward || p.base || 0);
     const url = p.url || p.link || '';
-    // call runTaskFlow asynchronously (do not block handler)
     setTimeout(()=> { try{ runTaskFlow({ task_id: id, url, secs, rewardBase: reward, reward: reward, _source:'ui' }); }catch(e){ console.warn('awaitRunTaskFlowFromPayload err', e); } }, 10);
   }catch(e){ console.warn('awaitRunTaskFlowFromPayload', e); }
 }
@@ -837,13 +916,14 @@ async function router(){
   setMain(`<div class="small">Hosted — waiting for instruction. If parent opened an ad/task it will appear automatically.</div>`);
 }
 
+/* start up */
 setTimeout(()=> {
   generateDailyAds();
   router();
 }, 120);
 window.addEventListener('hashchange', ()=> router());
 
-/* keep compatibility: expose small debug toggle if dbg=1 in query */
+/* debug toggle */
 try{ const q = combinedQP(); if(q.dbg === '1'){ el('dbg').classList.add('dbg-visible'); el('dbg').textContent = 'dbg on'; } }catch(e){}
 </script>
 </body>
