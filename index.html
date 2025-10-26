@@ -472,7 +472,8 @@ async function renderTaskBoard(qp){
 
 /* ===== RUN TASK FLOW (uses secs/reward passed by UI if present) ===== */
 async function runTaskFlow(opts){
-  pushView && pushView('task');
+  // FIX: guard calls to pushView/popView etc. (don't assume they exist)
+  try{ if(typeof pushView === 'function') pushView('task'); }catch(e){}
   setTitle('Task'); setVIPLabel();
   const taskId = opts.task_id || ('task_' + Math.random().toString(36).slice(2,8));
   const secs = Number(opts.secs || 30);
@@ -522,7 +523,7 @@ async function runTaskFlow(opts){
     postParent({ type:'task_complete', payload });
     postParent({ type:'task_verified', payload });
     note.textContent = 'Task verified. Returning...';
-    saveTaskState && saveTaskState({ date: nowDay(), status: 'completed' });
+    try{ if(typeof saveTaskState === 'function') saveTaskState({ date: nowDay(), status: 'completed' }); }catch(e){}
 
     // Close popup if open and cleanup parent tasks
     try{ if(popup && !popup.closed) popup.close(); }catch(e){}
@@ -585,7 +586,7 @@ async function runTaskFlow(opts){
               cleanup();
               const payload = { task_id: taskId, status: 'unverified_popup_closed', reward:0, base:0, vip_bonus:0, user_id: (profile && profile.user_id) || null };
               postParent({ type:'task_complete', payload });
-              saveTaskState && saveTaskState({ date: nowDay(), status: 'idle' });
+              try{ if(typeof saveTaskState === 'function') saveTaskState({ date: nowDay(), status: 'idle' }); }catch(e){}
               note.textContent = 'Popup closed before verification. Returning...';
               setTimeout(()=> postParent({ type:'close_hosted', reason:'popup_closed', payload }), 700);
             } else {
@@ -607,8 +608,8 @@ async function runTaskFlow(opts){
 
   cancelBtn.addEventListener('click', ()=>{
     postParent({ type:'task_skipped', payload: { task_id: taskId } });
-    popView && popView();
-    renderTaskBoard && renderTaskBoard({});
+    try{ if(typeof popView === 'function') popView(); }catch(e){}
+    try{ if(typeof renderTaskBoard === 'function') renderTaskBoard({}); }catch(e){}
   });
 
   window.addEventListener('beforeunload', ()=> { if(!finished) postParent({ type:'task_incomplete', payload:{ task_id: taskId } }); });
@@ -616,7 +617,7 @@ async function runTaskFlow(opts){
 
 /* ===== AD FLOW: prefers authoritative secs/reward from qp when passed (kept) ===== */
 async function renderAdFlow(qp){
-  pushView && pushView('ad');
+  try{ if(typeof pushView === 'function') pushView('ad'); }catch(e){}
   setTitle('Watch Ad'); setVIPLabel();
 
   const qpCombined = qp || combinedQP();
@@ -916,12 +917,29 @@ async function router(){
   setMain(`<div class="small">Hosted — waiting for instruction. If parent opened an ad/task it will appear automatically.</div>`);
 }
 
-/* start up */
-setTimeout(()=> {
-  generateDailyAds();
-  router();
-}, 120);
-window.addEventListener('hashchange', ()=> router());
+/* ===== startup: run after DOM ready (FIX: avoid race on immediate execution) ===== */
+// FIX: ensure we initialize only after DOM is ready (prevents timers firing before parent handshake)
+function startHostedBoot(){
+  try{
+    generateDailyAds();
+    router();
+    // wire back button to notify parent (FIX: added Close/Back behavior)
+    try{
+      const back = el('backBtn');
+      if(back){
+        back.addEventListener('click', ()=> {
+          postParent({ type:'close_hosted', reason:'user_back' });
+          try{ if(window.close) window.close(); }catch(e){}
+        });
+      }
+    }catch(e){ console.warn('backBtn wire err', e); }
+  }catch(e){ console.warn('hosted boot err', e); }
+}
+if(document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', startHostedBoot);
+} else {
+  startHostedBoot();
+}
 
 /* debug toggle */
 try{ const q = combinedQP(); if(q.dbg === '1'){ el('dbg').classList.add('dbg-visible'); el('dbg').textContent = 'dbg on'; } }catch(e){}
