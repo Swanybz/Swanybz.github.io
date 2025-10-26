@@ -43,11 +43,10 @@
   .dbg.dbg-visible{display:block}
   .gaingrid-verified{color:lightgreen;margin-top:6px;font-weight:600;font-size:12px}
 
-  /* landing specific */
-  .landing{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px}
-  .landing h1{margin:0;font-size:18px}
-  .landing .landing-buttons{display:flex;gap:12px}
-  .public-ad-placeholder{width:100%;max-width:468px;height:60px;margin-top:8px;border-radius:8px;background:rgba(255,255,255,0.02);display:flex;align-items:center;justify-content:center}
+  /* landing layout */
+  .landing-wrap{display:flex;flex-direction:column;gap:12px;align-items:center;justify-content:center;height:100%}
+  .landing-title{font-weight:700;font-size:18px;margin-bottom:6px}
+  .landing-sub{font-size:12px;color:rgba(255,255,255,0.7);text-align:center;max-width:320px}
 </style>
 </head>
 <body>
@@ -70,11 +69,11 @@
 
 <script>
 /* ============================
-   FULL HOSTED HTML (final, public-ready)
-   - Added public landing with Task Board / Ads buttons
-   - AdSense container visible on landing
-   - generateDailyAds only triggered when Ads view is entered (or parent sends start_payload)
-   - All original functions/IDs/names preserved
+   FULL HOSTED HTML (updated for public landing + AdSense visibility)
+   - preserves all original names, logic, events & UI
+   - adds a public landing with Task Board / Ads Center buttons
+   - prevents auto-starting ad timers until Ads view is requested
+   - ensures ad slot visible for AdSense on landing
    ============================ */
 
 /* ===== EARLY QUEUE: make sure we never drop a start_payload ===== */
@@ -138,7 +137,8 @@ function processStartPayload(p){
     // ad
     if(p.ad_id || p.type === 'ad' || p.isAd){
       if(typeof renderAdFlow === 'function'){
-        // ensure ads generated if user is seeing Ads
+        // ensure daily ads are generated when parent triggers an ad
+        if(!GENERATED_ADS_INITIALIZED) { generateDailyAds(); GENERATED_ADS_INITIALIZED = true; }
         renderAdFlow({ ad_id: p.ad_id || p.id, secs: p.secs, reward: p.reward, vip: p.vip || p.vip_level });
         return;
       }
@@ -199,6 +199,9 @@ const KEY_ADS_DATA = 'ads_data';
 const KEY_ADS_DATE = 'ads_date';
 const KEY_TASKS = 'gg_hosted_tasks_done';
 const KEY_LAST_AD = 'gg_hosted_last_ad';
+
+/* small guard: do not auto-generate ads until we need them */
+let GENERATED_ADS_INITIALIZED = false;
 
 /* ===== helpers ===== */
 const el = id => document.getElementById(id);
@@ -434,52 +437,47 @@ function setMain(html){ if(el('main')) el('main').innerHTML = html; }
 function setTitle(t){ if(el('hostTitle')) el('hostTitle').textContent = t || 'Hosted view'; }
 function setVIPLabel(){ const qp = combinedQP(); const vip = (qp.vip || qp.vip_level) || (profile && profile.vip_level) || (readLocalProfile() && readLocalProfile().vip_level) || ''; if(el('vipInfo')) el('vipInfo').textContent = vip ? ('VIP: ' + vip) : 'VIP: —'; }
 
-/* ===== PUBLIC LANDING (ADDED) =====
-   - Shows two buttons: Task Board and Ads Center
-   - Shows a visible AdSense placeholder so AdSense crawlers can see an ad slot
+/* ---- Landing view (public) ----
+   Visible when no deeplink/parent message instructs the page.
+   Contains visible AdSense slot so Google can crawl the ad area.
 */
 function renderLanding(){
-  setTitle('GainGrid');
-  setVIPLabel();
-
-  // Landing HTML keeps card UI feel and includes a visible AdSense placeholder
+  // visible AdSense slot (so AdSense reviewer sees a stable ad placeholder)
   const landingHtml = `
-    <div class="landing">
-      <h1>GainGrid — Tasks & Ads</h1>
-      <div class="landing-buttons">
-        <button id="btnTasksPublic" class="btn">🧾 Task Board</button>
-        <button id="btnAdsPublic" class="btn">🎥 Ads Center</button>
+    <div class="landing-wrap">
+      <div class="landing-title">GainGrid — Tasks & Ads</div>
+      <div class="landing-sub">Public preview: use the buttons below to open Task Board or Ads Center. This page also works embedded via Gain.web and responds to deeplinks.</div>
+      <div style="display:flex;gap:10px">
+        <button id="landingTasksBtn" class="btn">🧾 Task Board</button>
+        <button id="landingAdsBtn" class="btn">🎥 Ads Center</button>
       </div>
-      <div class="small">Open via Gain.web? It will still function the same.</div>
-      <div class="public-ad-placeholder" id="publicAdHolder">
-        <!-- visible AdSense anchor for crawlers -->
-        <ins class="adsbygoogle"
-             style="display:inline-block;width:468px;height:60px"
-             data-ad-client="ca-pub-2309008538670900"
-             data-ad-slot="4194843603"></ins>
+      <div style="margin-top:12px;width:100%;display:flex;justify-content:center">
+        <div id="adPlayerAdsenseHolder" style="width:100%;max-width:468px; text-align:center;">
+          <!-- Visible AdSense placeholder for review -->
+          <ins class="adsbygoogle"
+               style="display:inline-block;width:468px;height:60px"
+               data-ad-client="ca-pub-2309008538670900"
+               data-ad-slot="4194843603"></ins>
+        </div>
       </div>
-      <div class="small">(Click Ads Center to load ad player and timers.)</div>
     </div>
   `;
   setMain(landingHtml);
+  try{ (adsbygoogle = window.adsbygoogle || []).push({}); }catch(e){}
 
-  // wire buttons
-  const tbtn = el('btnTasksPublic'), abtn = el('btnAdsPublic');
-  if(tbtn) tbtn.addEventListener('click', ()=> {
-    // open the task board same as deeplink would
-    try{ location.hash = '#/task'; }catch(e){}
+  // wire landing buttons
+  const tb = el('landingTasksBtn'), ab = el('landingAdsBtn');
+  if(tb) tb.addEventListener('click', ()=> {
+    // navigate to tasks view
+    location.hash = '#/task';
     router();
   });
-  if(abtn) abtn.addEventListener('click', ()=> {
-    // load ads view (this will call generateDailyAds inside renderAdFlow)
-    try{ location.hash = '#/ad'; }catch(e){}
+  if(ab) ab.addEventListener('click', ()=> {
+    // ensure ad data present and open ad view
+    if(!GENERATED_ADS_INITIALIZED){ generateDailyAds(); GENERATED_ADS_INITIALIZED = true; }
+    location.hash = '#/ad';
     router();
   });
-
-  // push adsbygoogle on the visible placeholder (so crawler sees it)
-  try{
-    (adsbygoogle = window.adsbygoogle || []).push({});
-  }catch(e){}
 }
 
 /* render task board (kept; prefer PARENT_TASKS if present) */
@@ -525,7 +523,6 @@ async function renderTaskBoard(qp){
 
 /* ===== RUN TASK FLOW (uses secs/reward passed by UI if present) ===== */
 async function runTaskFlow(opts){
-  // FIX: guard calls to pushView/popView etc. (don't assume they exist)
   try{ if(typeof pushView === 'function') pushView('task'); }catch(e){}
   setTitle('Task'); setVIPLabel();
   const taskId = opts.task_id || ('task_' + Math.random().toString(36).slice(2,8));
@@ -551,7 +548,6 @@ async function runTaskFlow(opts){
     finished = true;
     cleanup();
     const vip = vipFrom({});
-    // prefer authoritative reward provided by parent; otherwise fallback to calcTaskReward
     let rewardObj;
     if(authoritativeReward !== null){
       const vipBonus = VIP_BONUS[(vip||'').toString().toLowerCase()] || 0;
@@ -578,7 +574,6 @@ async function runTaskFlow(opts){
     note.textContent = 'Task verified. Returning...';
     try{ if(typeof saveTaskState === 'function') saveTaskState({ date: nowDay(), status: 'completed' }); }catch(e){}
 
-    // Close popup if open and cleanup parent tasks
     try{ if(popup && !popup.closed) popup.close(); }catch(e){}
     try{
       if(PARENT_TASKS && Array.isArray(PARENT_TASKS)){
@@ -675,13 +670,13 @@ async function renderAdFlow(qp){
 
   const qpCombined = qp || combinedQP();
 
-  // Ensure ad pool exists for this day when Ads view is entered by public or parent
-  try{ generateDailyAds(); }catch(e){ /* safe guard */ }
-
   const passedAdId = qpCombined.ad_id || qpCombined.id || qpCombined.ad || null;
   const passedSecs = Number(qpCombined.secs || qpCombined.s || qpCombined.duration || 0) || null;
   const passedReward = Number(qpCombined.reward || qpCombined.r || 0) || null;
   const passedVip = qpCombined.vip || qpCombined.vip_level || null;
+
+  // ensure daily ads exist when entering ad view from public landing or deeplink
+  if(!GENERATED_ADS_INITIALIZED){ generateDailyAds(); GENERATED_ADS_INITIALIZED = true; }
 
   const watched = getWatched();
   if(watched.length >= ADS_LIMIT){
@@ -792,6 +787,7 @@ async function renderAdFlow(qp){
       postParent({ type:'ad_complete', payload });
       postParent({ type:'task_complete', payload });
       if(retBtn){ retBtn.classList.remove('hidden'); retBtn.textContent = (detectSource(qpCombined) === 'ui' ? 'Return to Game' : 'Close'); }
+      // make sure the iframe/popup stays open a little so parent can validate; then request close
       setTimeout(()=>{ postParent({ type:'close_hosted', reason:'ad_done', payload }); try{ if(window.close) window.close(); }catch(e){} }, 900);
     }
   }, 1000);
@@ -896,6 +892,7 @@ window.addEventListener('message', function(ev){
       if(p && (p.ad_id || p.task_id || p.id)){
         const incoming = Object.assign({}, p, { from: 'ui' });
         if(p.ad_id || p.type === 'ad' || p.isAd){
+          if(!GENERATED_ADS_INITIALIZED){ generateDailyAds(); GENERATED_ADS_INITIALIZED = true; }
           renderAdFlow({ ad_id: p.ad_id || p.id, secs: p.secs, reward: p.reward, vip: p.vip, vip_level: p.vip_level });
           return;
         }
@@ -912,6 +909,7 @@ window.addEventListener('message', function(ev){
     }
 
     if(d.type === 'open_ad' && d.payload && d.payload.ad_id){
+      if(!GENERATED_ADS_INITIALIZED){ generateDailyAds(); GENERATED_ADS_INITIALIZED = true; }
       location.hash = '#/ad?id=' + encodeURIComponent(d.payload.ad_id) + '&secs=' + encodeURIComponent(d.payload.secs||'') + '&reward=' + encodeURIComponent(d.payload.reward||'') + '&vip=' + encodeURIComponent(d.payload.vip||'');
       router();
     }
@@ -950,6 +948,7 @@ async function router(){
       if(action.includes('ad') || action.includes('watch')){
         if(payload && (payload.ad_id || payload.id)) qp.ad_id = payload.ad_id || payload.id;
         qp.vip = qp.vip || payload.vip || payload.vip_level;
+        if(!GENERATED_ADS_INITIALIZED){ generateDailyAds(); GENERATED_ADS_INITIALIZED = true; }
         await renderAdFlow(qp);
         return;
       } else if(action.includes('task')){
@@ -962,6 +961,7 @@ async function router(){
   }
 
   if(qp.ad_id || qp.id || (location.hash && location.hash.toLowerCase().includes('/ad'))){
+    if(!GENERATED_ADS_INITIALIZED){ generateDailyAds(); GENERATED_ADS_INITIALIZED = true; }
     await renderAdFlow(qp);
     return;
   }
@@ -970,15 +970,15 @@ async function router(){
     return;
   }
 
-  // If nothing requested, show public landing (instead of waiting-only message)
+  // Default public landing when nothing instructs the page.
   renderLanding();
 }
 
 /* ===== startup: run after DOM ready (FIX: avoid race on immediate execution) ===== */
-// IMPORTANT: do NOT auto-run generateDailyAds on direct open. It will be triggered when Ads view is entered.
 function startHostedBoot(){
   try{
-    // Start router; router will decide whether to show landing, task board, or ads.
+    // do NOT auto-run generateDailyAds on direct open to avoid timers firing before parent handshake
+    // router will decide (and generateDailyAds when entering Ads view)
     router();
 
     // wire back button to notify parent (FIX: added Close/Back behavior)
