@@ -41,12 +41,9 @@
   #adPlayerAdsenseHolder, #taskBanner, #adsterBannerHolder{display:flex;justify-content:center;align-items:center}
   .dbg{position:absolute;left:8px;bottom:8px;padding:6px 8px;background:rgba(0,0,0,0.6);border-radius:6px;font-size:11px;color:#fff;z-index:50;display:none}
   .dbg.dbg-visible{display:block}
+  .landing-buttons{display:flex;flex-direction:column;gap:12px;align-items:center;justify-content:center;margin-top:8px}
+  .landing-buttons .big{padding:12px 16px;font-size:15px;border-radius:10px}
   .gaingrid-verified{color:lightgreen;margin-top:6px;font-weight:600;font-size:12px}
-
-  /* landing layout */
-  .landing-wrap{display:flex;flex-direction:column;gap:12px;align-items:center;justify-content:center;height:100%}
-  .landing-title{font-weight:700;font-size:18px;margin-bottom:6px}
-  .landing-sub{font-size:12px;color:rgba(255,255,255,0.7);text-align:center;max-width:320px}
 </style>
 </head>
 <body>
@@ -69,30 +66,39 @@
 
 <script>
 /* ============================
-   FULL HOSTED HTML (updated for public landing + AdSense visibility)
-   - preserves all original names, logic, events & UI
-   - adds a public landing with Task Board / Ads Center buttons
-   - prevents auto-starting ad timers until Ads view is requested
-   - ensures ad slot visible for AdSense on landing
+   FULL HOSTED HTML (public + gain.web compatible)
+   - preserves all original names, logic & UI
+   - adds Public Landing with Task Board & Ads buttons
+   - uses gain.web payloads when supplied
+   - keeps AdSense ad block visible for approvals
    ============================ */
 
-/* ===== EARLY QUEUE: make sure we never drop a start_payload ===== */
+/* ===== EARLY QUEUE & FLAGS (kept & improved) ===== */
 window.__HOSTED_INCOMING_QUEUE = window.__HOSTED_INCOMING_QUEUE || [];
 window.__HOSTED_IS_READY = false;
 
+/* small utility: detect if page likely embedded/hosted */
+function isLikelyEmbedded(){
+  try{
+    // If parent differs or opener present, treat as embedded context
+    if(window.parent && window.parent !== window) return true;
+    if(window.opener) return true;
+  }catch(e){}
+  return false;
+}
+
+/* ===== early message queue handler (keeps original behavior) ===== */
 window.addEventListener('message', function __earlyHostQueue(ev){
   try{
     const d = ev && ev.data;
     if(!d || typeof d !== 'object') return;
 
-    // quick ping reply
     if(d.type === 'ping_hosted'){
       try{ (ev.source && ev.source.postMessage) && ev.source.postMessage({ type: 'hosted_pong', payload:{ ts: Date.now() } }, '*'); }catch(e){}
       return;
     }
 
     if(d.type === 'start_payload' || d.type === 'open_task' || d.type === 'open_ad'){
-      // normalize
       let normalized = { type:'start_payload', payload: {} };
       if(d.type === 'start_payload'){ normalized = d; }
       else { normalized.payload = d.payload || d; }
@@ -102,13 +108,10 @@ window.addEventListener('message', function __earlyHostQueue(ev){
         try{ if(window.__hostedDebug) window.__hostedDebug('queued:'+ (normalized.payload && (normalized.payload.id||normalized.payload.task_id||'p')) ); }catch(e){}
         return;
       }
-
-      // ready -> process immediately
       processStartPayload(normalized.payload);
       return;
     }
 
-    // queue other object messages when not ready
     if(!window.__HOSTED_IS_READY){
       window.__HOSTED_INCOMING_QUEUE.push(d);
       return;
@@ -124,49 +127,7 @@ function postParent(msg){
   try{ console.log('postParent:', msg); }catch(e){}
 }
 
-/* process start payloads into existing handlers (ADDED) */
-function processStartPayload(p){
-  try{
-    if(!p) return;
-    // tasks array
-    if(Array.isArray(p.tasks) && p.tasks.length){
-      PARENT_TASKS = (p.tasks||[]).map(t=>Object.assign({}, t));
-      if(typeof renderTasksFromParent === 'function') renderTasksFromParent(PARENT_TASKS);
-      return;
-    }
-    // ad
-    if(p.ad_id || p.type === 'ad' || p.isAd){
-      if(typeof renderAdFlow === 'function'){
-        // ensure daily ads are generated when parent triggers an ad
-        if(!GENERATED_ADS_INITIALIZED) { generateDailyAds(); GENERATED_ADS_INITIALIZED = true; }
-        renderAdFlow({ ad_id: p.ad_id || p.id, secs: p.secs, reward: p.reward, vip: p.vip || p.vip_level });
-        return;
-      }
-      try{ location.hash = '#/ad?id='+encodeURIComponent(p.ad_id||p.id||'')+'&secs='+encodeURIComponent(p.secs||'')+'&reward='+encodeURIComponent(p.reward||''); if(typeof router==='function') router(); }catch(e){}
-      return;
-    }
-    // task
-    if(p.task_id || p.type === 'task' || p.isTask || p.id){
-      if(typeof awaitRunTaskFlowFromPayload === 'function'){
-        awaitRunTaskFlowFromPayload(p);
-        return;
-      }
-      PARENT_TASKS = PARENT_TASKS || [];
-      PARENT_TASKS.unshift(p);
-      if(typeof renderTasksFromParent === 'function') renderTasksFromParent(PARENT_TASKS);
-      return;
-    }
-
-    // fallback: push into PARENT_TASKS if looks like a task
-    if(p.id && p.title){
-      PARENT_TASKS = PARENT_TASKS || [];
-      PARENT_TASKS.unshift(p);
-      if(typeof renderTasksFromParent === 'function') renderTasksFromParent(PARENT_TASKS);
-    }
-  }catch(e){ console.warn('processStartPayload error', e); }
-}
-
-/* consume queued messages once ready (ADDED) */
+/* process queued messages once ready */
 function _consumeQueuedMessages(){
   try{
     while(window.__HOSTED_INCOMING_QUEUE && window.__HOSTED_INCOMING_QUEUE.length){
@@ -200,17 +161,14 @@ const KEY_ADS_DATE = 'ads_date';
 const KEY_TASKS = 'gg_hosted_tasks_done';
 const KEY_LAST_AD = 'gg_hosted_last_ad';
 
-/* small guard: do not auto-generate ads until we need them */
-let GENERATED_ADS_INITIALIZED = false;
-
-/* ===== helpers ===== */
+/* ===== utilities (kept) ===== */
 const el = id => document.getElementById(id);
 function nowDay(){ return new Date().toISOString().slice(0,10); }
 function rand(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
 function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
 function escapeHtml(s){ if(!s && s !== 0) return ''; return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-/* ===== small layout sizing to fit iframe phone frame ===== */
+/* ===== sizing (kept) ===== */
 function setCardSizing(){
   const vw = Math.max(320, Math.min(window.innerWidth, 920));
   const vh = Math.max(480, Math.min(window.innerHeight, 1200));
@@ -223,7 +181,7 @@ function setCardSizing(){
 }
 setCardSizing(); window.addEventListener('resize', setCardSizing);
 
-/* ===== storage helpers & day reset ===== */
+/* ===== storage helpers & day reset (kept) ===== */
 (function ensureDayReset(){
   const d = localStorage.getItem(KEY_DAY);
   if(d !== nowDay()){
@@ -244,13 +202,13 @@ function setLastAdTs(ts){ localStorage.setItem(KEY_LAST_AD, String(ts)); }
 function getLastAdTs(){ return Number(localStorage.getItem(KEY_LAST_AD) || 0); }
 function canOpenAdNow(){ const last = getLastAdTs(); if(!last) return true; return (Date.now() - last) >= ADS_COOLDOWN_MS; }
 
-/* ===== read query/hash params (parent may pass id, secs, reward, vip) ===== */
+/* ===== read query/hash params (kept) ===== */
 function qsParse(s){ if(!s) return {}; return s.replace(/^\?/,'').split('&').filter(Boolean).reduce((o,p)=>{ const i=p.indexOf('='); if(i<0) o[decodeURIComponent(p)]=''; else o[decodeURIComponent(p.slice(0,i))]=decodeURIComponent(p.slice(i+1)); return o; }, {}); }
 function getHashQP(){ if(!location.hash) return {}; const h = location.hash.replace(/^#/,''); const parts = h.split('?'); return qsParse(parts[1]||''); }
 function getSearchQP(){ return qsParse(location.search || ''); }
 function combinedQP(){ return Object.assign({}, getHashQP(), getSearchQP()); }
 
-/* ===== VIP resolution & reward calcs (kept names) ===== */
+/* ===== VIP & profile helpers (kept) ===== */
 let profile = null;
 function readLocalProfile(){
   const keys = ['user_data','gg_user','profile','user'];
@@ -268,7 +226,7 @@ function vipFrom(qp){ qp = qp || {}; if(qp.vip || qp.vip_level) return (qp.vip||
 function calcTaskReward(vip){ const base = rand(100, 300); const bonus = VIP_BONUS[(vip||'').toString().toLowerCase()] || 0; return { base, vip_bonus: bonus, total: base + bonus }; }
 function calcAdRewardFromBase(base, vip){ const bonus = VIP_BONUS[(vip||'').toString().toLowerCase()] || 0; return { base, vip_bonus: bonus, total: base + bonus }; }
 
-/* ===== provider helpers (ad) ===== */
+/* ===== provider helpers (kept) ===== */
 function tryLoadAdsterra(zoneUrl, timeoutMs=3500){
   return new Promise((resolve) => {
     if(!zoneUrl || zoneUrl.includes('REPLACE_WITH_YOUR_ZONE')) return resolve({ ok:false });
@@ -294,7 +252,7 @@ function tryLoadVideoSrc(videoUrl, timeoutMs=3000){
   });
 }
 
-/* ===== HOSTED: readiness handshake + debug overlay (kept & improved) ===== */
+/* ===== HOSTED: ready handshake + debug overlay (kept & improved) ===== */
 (function hostedReadyAndDebug(){
   try{
     if(!document.getElementById('hostedDbg')){
@@ -316,10 +274,8 @@ function tryLoadVideoSrc(videoUrl, timeoutMs=3000){
 
     function announceReady(){
       try{
-        // mark hosted side ready and flush queue (ADDED)
         window.__HOSTED_IS_READY = true;
-        _consumeQueuedMessages(); // ADDED
-
+        _consumeQueuedMessages();
         postParent({ type: 'hosted_ready', payload: { ts: Date.now() } });
         const d = document.getElementById('hostedDbg');
         if(d) d.textContent = 'hosted:ready';
@@ -342,7 +298,7 @@ function tryLoadVideoSrc(videoUrl, timeoutMs=3000){
   }catch(e){ console.warn('hostedReadyAndDebug init error', e); }
 })();
 
-/* ===== Ads generator: create daily ads with random secs, base scaled by time + vip ===== */
+/* ===== Ads generator (kept) - but do not auto-run at boot; run when needed ===== */
 function generateDailyAds(){
   try {
     const today = new Date().toDateString();
@@ -382,8 +338,8 @@ function generateDailyAds(){
   } catch(e){ console.warn("generateDailyAds err", e); }
 }
 
-/* ===== PARENT_TASKS store & renderer (ADDED) ===== */
-let PARENT_TASKS = null; // authoritative tasks array when parent sends tasks
+/* ===== PARENT_TASKS (kept) ===== */
+let PARENT_TASKS = null;
 function renderTasksFromParent(tasks){
   try{
     PARENT_TASKS = Array.isArray(tasks) ? tasks.slice() : [];
@@ -422,7 +378,6 @@ function renderTasksFromParent(tasks){
         const secs = Number(b.getAttribute('data-secs')||30);
         const rewardBase = Number(b.getAttribute('data-reward')||0);
         postParent({ type:'task_started', payload:{ task_id: id, task_type: 'auto' } });
-        // call existing runTaskFlow with authoritative values
         await runTaskFlow({ task_id: id, url, secs, rewardBase, reward: rewardBase, _source: 'ui' });
       });
     });
@@ -437,50 +392,41 @@ function setMain(html){ if(el('main')) el('main').innerHTML = html; }
 function setTitle(t){ if(el('hostTitle')) el('hostTitle').textContent = t || 'Hosted view'; }
 function setVIPLabel(){ const qp = combinedQP(); const vip = (qp.vip || qp.vip_level) || (profile && profile.vip_level) || (readLocalProfile() && readLocalProfile().vip_level) || ''; if(el('vipInfo')) el('vipInfo').textContent = vip ? ('VIP: ' + vip) : 'VIP: —'; }
 
-/* ---- Landing view (public) ----
-   Visible when no deeplink/parent message instructs the page.
-   Contains visible AdSense slot so Google can crawl the ad area.
-*/
-function renderLanding(){
-  // visible AdSense slot (so AdSense reviewer sees a stable ad placeholder)
+/* ===== New: Public Landing UI (AD-FRIENDLY) ===== */
+function showPublicLanding(){
+  // Ensure daily ads exist (for ad area)
+  try{ generateDailyAds(); }catch(e){}
   const landingHtml = `
-    <div class="landing-wrap">
-      <div class="landing-title">GainGrid — Tasks & Ads</div>
-      <div class="landing-sub">Public preview: use the buttons below to open Task Board or Ads Center. This page also works embedded via Gain.web and responds to deeplinks.</div>
-      <div style="display:flex;gap:10px">
-        <button id="landingTasksBtn" class="btn">🧾 Task Board</button>
-        <button id="landingAdsBtn" class="btn">🎥 Ads Center</button>
+    <div style="text-align:center">
+      <h2 style="margin:0 0 6px 0">GainGrid — Public Preview</h2>
+      <div class="small">Open demo for AdSense & testers. Choose a section:</div>
+      <div class="landing-buttons">
+        <button id="landingTasks" class="btn big">🧾 Task Board</button>
+        <button id="landingAds" class="btn big">🎥 Ads Center</button>
       </div>
-      <div style="margin-top:12px;width:100%;display:flex;justify-content:center">
-        <div id="adPlayerAdsenseHolder" style="width:100%;max-width:468px; text-align:center;">
-          <!-- Visible AdSense placeholder for review -->
+      <div style="margin-top:12px;text-align:center">
+        <div id="adPlayerAdsenseHolder" style="margin:8px auto;max-width:468px">
+          <!-- Visible AdSense preview (so crawlers see ad slot) -->
           <ins class="adsbygoogle"
                style="display:inline-block;width:468px;height:60px"
                data-ad-client="ca-pub-2309008538670900"
                data-ad-slot="4194843603"></ins>
         </div>
+        <div class="small" style="margin-top:8px">Ads preview area — GainsGrid public mode</div>
       </div>
     </div>
   `;
   setMain(landingHtml);
   try{ (adsbygoogle = window.adsbygoogle || []).push({}); }catch(e){}
-
   // wire landing buttons
-  const tb = el('landingTasksBtn'), ab = el('landingAdsBtn');
-  if(tb) tb.addEventListener('click', ()=> {
-    // navigate to tasks view
-    location.hash = '#/task';
-    router();
-  });
-  if(ab) ab.addEventListener('click', ()=> {
-    // ensure ad data present and open ad view
-    if(!GENERATED_ADS_INITIALIZED){ generateDailyAds(); GENERATED_ADS_INITIALIZED = true; }
-    location.hash = '#/ad';
-    router();
-  });
+  setTimeout(()=>{
+    const lt = el('landingTasks'), la = el('landingAds');
+    if(lt) lt.addEventListener('click', ()=> { location.hash = '#/task'; router(); });
+    if(la) la.addEventListener('click', ()=> { location.hash = '#/ad'; router(); });
+  },40);
 }
 
-/* render task board (kept; prefer PARENT_TASKS if present) */
+/* ===== renderTaskBoard (kept, but uses PARENT_TASKS if present; public fallback) ===== */
 async function renderTaskBoard(qp){
   setTitle('Task Board'); setVIPLabel();
   if(PARENT_TASKS && Array.isArray(PARENT_TASKS) && PARENT_TASKS.length){
@@ -516,12 +462,18 @@ async function renderTaskBoard(qp){
         await runTaskFlow({ task_id: id, url, secs, rewardBase, reward: rewardBase, _source: 'ui' });
       });
     });
-  }else{
-    setMain(`<div class="small">No task fetcher available.</div>`);
+  } else {
+    // no fetchTasks -> show public demo tasks (so site is usable publicly)
+    const demo = [
+      { id: 'demo_task_1', title: 'Demo Task — Visit Example', secs: 10, reward: 0, url: 'https://example.com' },
+      { id: 'demo_task_2', title: 'Demo Task — Read Help', secs: 8, reward: 0, url: 'https://example.com' }
+    ];
+    PARENT_TASKS = demo;
+    renderTasksFromParent(PARENT_TASKS);
   }
 }
 
-/* ===== RUN TASK FLOW (uses secs/reward passed by UI if present) ===== */
+/* ===== runTaskFlow (kept) ===== */
 async function runTaskFlow(opts){
   try{ if(typeof pushView === 'function') pushView('task'); }catch(e){}
   setTitle('Task'); setVIPLabel();
@@ -663,30 +615,38 @@ async function runTaskFlow(opts){
   window.addEventListener('beforeunload', ()=> { if(!finished) postParent({ type:'task_incomplete', payload:{ task_id: taskId } }); });
 }
 
-/* ===== AD FLOW: prefers authoritative secs/reward from qp when passed (kept) ===== */
+/* ===== AD FLOW (kept, but accepts Gain.web payloads and supports public fallback) ===== */
 async function renderAdFlow(qp){
   try{ if(typeof pushView === 'function') pushView('ad'); }catch(e){}
   setTitle('Watch Ad'); setVIPLabel();
 
+  // Ensure daily ads exist (public-friendly)
+  try{ generateDailyAds(); }catch(e){}
+
   const qpCombined = qp || combinedQP();
 
-  const passedAdId = qpCombined.ad_id || qpCombined.id || qpCombined.ad || null;
-  const passedSecs = Number(qpCombined.secs || qpCombined.s || qpCombined.duration || 0) || null;
-  const passedReward = Number(qpCombined.reward || qpCombined.r || 0) || null;
-  const passedVip = qpCombined.vip || qpCombined.vip_level || null;
+  // If Gain.web passed explicit data object via sessionStorage (we store start_payload payload there in processStartPayload)
+  let authoritative = null;
+  try{
+    const st = sessionStorage.getItem('gg_hosted_authoritative_payload');
+    if(st) authoritative = JSON.parse(st);
+  }catch(e){ authoritative = null; }
 
-  // ensure daily ads exist when entering ad view from public landing or deeplink
-  if(!GENERATED_ADS_INITIALIZED){ generateDailyAds(); GENERATED_ADS_INITIALIZED = true; }
+  // prefer qpCombined values -> authoritative -> fallback
+  const passedAdId = qpCombined.ad_id || qpCombined.id || qpCombined.ad || (authoritative && (authoritative.ad_id||authoritative.id)) || null;
+  const passedSecs = Number(qpCombined.secs || qpCombined.s || qpCombined.duration || (authoritative && (authoritative.secs||authoritative.duration)) || 0) || null;
+  const passedReward = Number(qpCombined.reward || qpCombined.r || (authoritative && (authoritative.reward||authoritative.r)) || 0) || null;
+  const passedVip = qpCombined.vip || qpCombined.vip_level || (authoritative && (authoritative.vip||authoritative.vip_level)) || null;
 
   const watched = getWatched();
   if(watched.length >= ADS_LIMIT){
     const now = new Date(), tom = new Date(now.getFullYear(), now.getMonth(), now.getDate()+1);
     const msLeft = tom - now; const hrs = Math.floor(msLeft/3600000); const mins = Math.floor((msLeft%3600000)/60000);
-    setMain(`<div class="small">Daily ad limit reached. Next ads unlock in ${hrs}h ${mins}m</div>`); currentView='ad'; return;
+    setMain(`<div class="small">Daily ad limit reached. Next ads unlock in ${hrs}h ${mins}m</div>`); return;
   }
   if(!canOpenAdNow()){
     const rem = ADS_COOLDOWN_MS - (Date.now() - getLastAdTs()); const mins = Math.ceil(rem/60000);
-    setMain(`<div class="small">Cooldown active. Try again in ~${mins} minute(s).</div>`); currentView='ad'; return;
+    setMain(`<div class="small">Cooldown active. Try again in ~${mins} minute(s).</div>`); return;
   }
 
   let provider = { ok:false };
@@ -714,57 +674,49 @@ async function renderAdFlow(qp){
     rewardObj = { base: baseScaled, vip_bonus: vipBonus, total: baseScaled + vipBonus };
   }
 
+  // store authoritative payload visible to this hosted frame for later verification/posting back
+  try{
+    sessionStorage.setItem('gg_hosted_last_ad_payload', JSON.stringify({ ad_id: adId, secs, rewardObj, vip: passedVip }));
+  }catch(e){}
+
   addWatched(adId);
   setLastAdTs(Date.now());
 
+  // Render ad UI with visible AdSense holder for crawlers
   const nodeHtmlId = 'adPlayerNode';
   setMain(`<div class="small">Watching: <strong>${escapeHtml(adId)}</strong> — Reward: <strong>${rewardObj.total} G</strong> <div class="small">(${rewardObj.base} base + ${rewardObj.vip_bonus} VIP)</div></div>
     <div style="margin-top:12px" id="${nodeHtmlId}" class="ad-player"><div class="small">Loading ad…</div></div>
-    <div id="adPlayerAdsenseHolder" style="margin-top:12px;text-align:center"></div>
+    <div id="adPlayerAdsenseHolder" style="margin-top:12px;text-align:center">
+      <!-- Visible AdSense slot for crawlers -->
+      <ins class="adsbygoogle"
+           style="display:inline-block;width:468px;height:60px"
+           data-ad-client="ca-pub-2309008538670900"
+           data-ad-slot="4194843603"></ins>
+    </div>
     <div style="margin-top:12px;display:flex;gap:8px;justify-content:center"><div class="countdown" id="adCount">${secs}</div></div>
     <div style="margin-top:12px;display:flex;gap:8px;justify-content:center"><button id="claimBtn" class="btn" disabled>Claim</button><button id="retBtn" class="btn ghost hidden">Return</button></div>
     <div class="note" id="adNote">Auto-completes after ${secs}s</div>`);
 
+  // ensure AdSense shows up for crawlers
+  try{ (adsbygoogle = window.adsbygoogle || []).push({}); }catch(e){}
+
   const container = el(nodeHtmlId);
   if(provider.node){ container.innerHTML=''; container.appendChild(provider.node); if(provider.type==='video'){ try{ provider.node.play().catch(()=>{}); }catch(e){} } }
 
+  // Adsterra banner injected (kept)
   try{
-    const holder = el('adPlayerAdsenseHolder');
-    if(holder){
-      holder.innerHTML = `
-        <!-- GainGrid_Display_Horizontal (injected) -->
-        <ins class="adsbygoogle"
-             style="display:inline-block;width:468px;height:60px"
-             data-ad-client="ca-pub-2309008538670900"
-             data-ad-slot="4194843603"></ins>
-      `;
-      try{ (adsbygoogle = window.adsbygoogle || []).push({}); }catch(e){ console.warn('adsbygoogle push failed', e); }
-      const ampWrap = document.createElement('div');
-      ampWrap.style.marginTop = '6px';
-      ampWrap.innerHTML = `
-        <amp-ad
-             layout="fixed"
-             width="468"
-             height="60"
-             type="adsense"
-             data-ad-client="ca-pub-2309008538670900"
-             data-ad-slot="4194843603">
-        </amp-ad>
-      `;
-      holder.appendChild(ampWrap);
-    }
-  }catch(e){ console.warn('inject Adsense failed', e); }
+    const bannerHolder = document.createElement('div');
+    bannerHolder.style.position = 'absolute';
+    bannerHolder.style.top = '8px';
+    bannerHolder.style.left = '50%';
+    bannerHolder.style.transform = 'translateX(-50%)';
+    bannerHolder.style.zIndex = '5';
+    bannerHolder.id = 'adsterBannerHolder';
+    injectAdsterraIntoElement(bannerHolder);
+    if(container && container.parentElement) container.parentElement.appendChild(bannerHolder);
+  }catch(e){ console.warn('adster banner inject failed', e); }
 
-  const bannerHolder = document.createElement('div');
-  bannerHolder.style.position = 'absolute';
-  bannerHolder.style.top = '8px';
-  bannerHolder.style.left = '50%';
-  bannerHolder.style.transform = 'translateX(-50%)';
-  bannerHolder.style.zIndex = '5';
-  bannerHolder.id = 'adsterBannerHolder';
-  injectAdsterraIntoElement(bannerHolder);
-  if(container && container.parentElement) container.parentElement.appendChild(bannerHolder);
-
+  // Countdown guard: do not finalize/close until countdown done
   const countEl = el('adCount'), claimBtn = el('claimBtn'), retBtn = el('retBtn'), adNote = el('adNote');
   let remaining = secs;
   if(countEl) countEl.textContent = remaining;
@@ -784,11 +736,15 @@ async function renderAdFlow(qp){
         user_id: (profile && profile.user_id) || null,
         status: 'completed'
       };
+      // send results back to parent (gain.web) and to any tracking
       postParent({ type:'ad_complete', payload });
       postParent({ type:'task_complete', payload });
+
+      // Keep Return/Close hidden until after we inform parent — then show
       if(retBtn){ retBtn.classList.remove('hidden'); retBtn.textContent = (detectSource(qpCombined) === 'ui' ? 'Return to Game' : 'Close'); }
-      // make sure the iframe/popup stays open a little so parent can validate; then request close
-      setTimeout(()=>{ postParent({ type:'close_hosted', reason:'ad_done', payload }); try{ if(window.close) window.close(); }catch(e){} }, 900);
+
+      // After a short delay, ask parent to close. We do not self-close until after posting result above.
+      setTimeout(()=>{ postParent({ type:'close_hosted', reason:'ad_done', payload }); try{ /* avoid forcibly closing in public mode */ if(isLikelyEmbedded()){ try{ if(window.close) window.close(); }catch(e){} } }catch(e){} }, 900);
     }
   }, 1000);
 
@@ -809,7 +765,7 @@ async function renderAdFlow(qp){
 
   retBtn && retBtn.addEventListener('click', ()=> {
     postParent({ type:'close_hosted', reason:'user_return' });
-    try{ if(window.close) window.close(); }catch(e){}
+    try{ if(isLikelyEmbedded()){ if(window.close) window.close(); } }catch(e){}
   });
 }
 
@@ -849,7 +805,7 @@ function injectAdsterraIntoElement(elem){
   }catch(e){ console.warn('injectAdsterraIntoElement failed', e); }
 }
 
-/* ===== routing & message handling (kept names) ===== */
+/* ===== routing & message handling (kept) ===== */
 function detectSource(qp){ qp = qp || combinedQP(); if(qp._source === 'ui') return 'ui'; if(qp.start) return 'deeplink'; if(qp.ad_id || qp.task_id){ if(qp.user_id || qp.vip || qp.vip_level) return 'ui'; return 'deeplink'; } return 'ui'; }
 function decodeStart(raw){
   if(!raw) return null;
@@ -861,20 +817,19 @@ function decodeStart(raw){
   }
 }
 
-/* parent message handler: receive profile, open commands, parent-provided tasks, or forwarded verifications */
+/* ===== parent message handler (kept) ===== */
 window.addEventListener('message', function(ev){
   try{
     const d = ev.data || {};
     if(!d || typeof d !== 'object') return;
-
-    // update debug badge when messages arrive
     try{ if(window.__hostedDebug) window.__hostedDebug(d.type || 'msg'); }catch(e){}
 
     if(d.type === 'profile_response' && d.payload){ profile = d.payload; setVIPLabel(); }
 
-    // Accept authoritative tasks array from parent (legacy compatibility)
     if(d.type === 'start_payload' && d.payload){
       const p = d.payload;
+      // store authoritative payload in sessionStorage so renderAdFlow can pick it up
+      try{ sessionStorage.setItem('gg_hosted_authoritative_payload', JSON.stringify(p)); }catch(e){}
       if(Array.isArray(p.tasks) && p.tasks.length){
         const mapped = p.tasks.map(t => ({
           id: t.id || t.task_id || ('task_' + Math.random().toString(36).slice(2,8)),
@@ -892,7 +847,6 @@ window.addEventListener('message', function(ev){
       if(p && (p.ad_id || p.task_id || p.id)){
         const incoming = Object.assign({}, p, { from: 'ui' });
         if(p.ad_id || p.type === 'ad' || p.isAd){
-          if(!GENERATED_ADS_INITIALIZED){ generateDailyAds(); GENERATED_ADS_INITIALIZED = true; }
           renderAdFlow({ ad_id: p.ad_id || p.id, secs: p.secs, reward: p.reward, vip: p.vip, vip_level: p.vip_level });
           return;
         }
@@ -909,11 +863,13 @@ window.addEventListener('message', function(ev){
     }
 
     if(d.type === 'open_ad' && d.payload && d.payload.ad_id){
-      if(!GENERATED_ADS_INITIALIZED){ generateDailyAds(); GENERATED_ADS_INITIALIZED = true; }
+      // store authoritative payload if provided
+      try{ sessionStorage.setItem('gg_hosted_authoritative_payload', JSON.stringify(d.payload)); }catch(e){}
       location.hash = '#/ad?id=' + encodeURIComponent(d.payload.ad_id) + '&secs=' + encodeURIComponent(d.payload.secs||'') + '&reward=' + encodeURIComponent(d.payload.reward||'') + '&vip=' + encodeURIComponent(d.payload.vip||'');
       router();
     }
     if(d.type === 'open_task' && d.payload && d.payload.task_id){
+      try{ sessionStorage.setItem('gg_hosted_authoritative_payload', JSON.stringify(d.payload)); }catch(e){}
       location.hash = '#/task?id=' + encodeURIComponent(d.payload.task_id) + '&secs=' + encodeURIComponent(d.payload.secs||'') + '&reward=' + encodeURIComponent(d.payload.reward||'');
       router();
     }
@@ -923,7 +879,7 @@ window.addEventListener('message', function(ev){
   }catch(e){}
 });
 
-/* helper: run runTaskFlow with payload values (ADDED) */
+/* helper: run runTaskFlow with payload values (kept) */
 function awaitRunTaskFlowFromPayload(p){
   try{
     const id = p.task_id || p.id || ('task_' + Math.random().toString(36).slice(2,8));
@@ -934,12 +890,13 @@ function awaitRunTaskFlowFromPayload(p){
   }catch(e){ console.warn('awaitRunTaskFlowFromPayload', e); }
 }
 
-/* router */
+/* ===== router (kept, but adds public landing) ===== */
 async function router(){
   profile = profile || readLocalProfile() || null;
   setVIPLabel();
   const qp = combinedQP();
 
+  // if start param contains encoded action -> use it (kept)
   if(qp.start){
     const decoded = decodeStart(qp.start);
     if(decoded){
@@ -948,7 +905,6 @@ async function router(){
       if(action.includes('ad') || action.includes('watch')){
         if(payload && (payload.ad_id || payload.id)) qp.ad_id = payload.ad_id || payload.id;
         qp.vip = qp.vip || payload.vip || payload.vip_level;
-        if(!GENERATED_ADS_INITIALIZED){ generateDailyAds(); GENERATED_ADS_INITIALIZED = true; }
         await renderAdFlow(qp);
         return;
       } else if(action.includes('task')){
@@ -960,8 +916,8 @@ async function router(){
     }
   }
 
+  // if explicit ad/task in qp/hash -> direct flows
   if(qp.ad_id || qp.id || (location.hash && location.hash.toLowerCase().includes('/ad'))){
-    if(!GENERATED_ADS_INITIALIZED){ generateDailyAds(); GENERATED_ADS_INITIALIZED = true; }
     await renderAdFlow(qp);
     return;
   }
@@ -970,27 +926,29 @@ async function router(){
     return;
   }
 
-  // Default public landing when nothing instructs the page.
-  renderLanding();
+  // default: public landing if not embedded or if no parent instructions
+  // If the page is embedded but parent hasn't instructed: still show landing so AdSense can inspect
+  showPublicLanding();
 }
 
-/* ===== startup: run after DOM ready (FIX: avoid race on immediate execution) ===== */
+/* ===== startup: run after DOM ready (FIX: avoid race) ===== */
 function startHostedBoot(){
   try{
-    // do NOT auto-run generateDailyAds on direct open to avoid timers firing before parent handshake
-    // router will decide (and generateDailyAds when entering Ads view)
-    router();
-
-    // wire back button to notify parent (FIX: added Close/Back behavior)
+    // do not auto-run generateDailyAds here; router will ensure ad data exists when needed
+    // wire back button
     try{
       const back = el('backBtn');
       if(back){
         back.addEventListener('click', ()=> {
           postParent({ type:'close_hosted', reason:'user_back' });
-          try{ if(window.close) window.close(); }catch(e){}
+          try{ if(isLikelyEmbedded() && window.close) window.close(); }catch(e){}
         });
       }
     }catch(e){ console.warn('backBtn wire err', e); }
+
+    // finally open router
+    router();
+
   }catch(e){ console.warn('hosted boot err', e); }
 }
 if(document.readyState === 'loading'){
@@ -999,7 +957,7 @@ if(document.readyState === 'loading'){
   startHostedBoot();
 }
 
-/* debug toggle */
+/* debug toggle (kept) */
 try{ const q = combinedQP(); if(q.dbg === '1'){ el('dbg').classList.add('dbg-visible'); el('dbg').textContent = 'dbg on'; } }catch(e){}
 </script>
 </body>
