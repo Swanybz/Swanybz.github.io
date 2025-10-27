@@ -113,6 +113,37 @@ function tryDecodePayloadString(raw){
   } catch(err){ console.warn('tryDecodePayloadString err', err); return null; }
 }
 
+/* ---------- parse search query into object ---------- */
+function parseQP(qs){ if(!qs) return {}; return qs.replace(/^\?/,'').split('&').filter(Boolean).reduce((o,p)=>{ const i=p.indexOf('='); if(i<0) o[decodeURIComponent(p)]=''; else o[decodeURIComponent(p.slice(0,i))]=decodeURIComponent(p.slice(i+1)); return o; }, {}); }
+
+/* ---------- parse hash route: supports:
+     - #/ad?id=...&secs=...  (path style)
+     - #/task?id=...&secs=...
+     - #<base64payload>      (legacy base64-in-hash)
+  ---------- */
+function parseHashRoute(){
+  const rawHash = (location.hash || '').replace(/^#/,'');
+  if(!rawHash) return null;
+
+  // if hash looks like '/ad?...' or '/task?...'
+  if(rawHash.startsWith('/')){
+    const parts = rawHash.split('?');
+    const path = parts[0].toLowerCase(); // '/ad' or '/task' or '/adview'
+    const qs = parts[1] || '';
+    const obj = parseQP(qs);
+    return { mode: 'route', path, qp: obj };
+  }
+
+  // if it is a base64 payload (no '=' or '&' querylike)
+  if(rawHash.indexOf('=') === -1 && rawHash.indexOf('&') === -1 && rawHash.indexOf('?') !== 0){
+    const decoded = tryDecodePayloadString(decodeURIComponent(rawHash));
+    if(decoded) return { mode: 'payload', payload: decoded };
+  }
+
+  // fallback: attempt QS-style parse
+  return null;
+}
+
 /* ---------- central payload processor ---------- */
 function processStartPayload(payload){
   try{
@@ -124,7 +155,6 @@ function processStartPayload(payload){
     else if(payload.profile) applyUserData(payload.profile);
     // tasks array
     if(Array.isArray(payload.tasks) && payload.tasks.length){
-      // keep minimal rendering for parent-provided tasks
       PARENT_TASKS = payload.tasks.map(t => ({ id: t.id || t.task_id, title: t.title || t.name, secs: t.secs||t.duration||30, reward: t.reward||t.base||0, url: t.url||t.link||'' }));
       renderTasksFromParent(PARENT_TASKS);
       return;
@@ -147,19 +177,36 @@ function processStartPayload(payload){
   }catch(e){ console.warn('processStartPayload err', e); }
 }
 
-/* ---------- parse payload from hash on boot ---------- */
-(function parseHashPayloadOnBoot(){
+/* ---------- parse hash payload on boot (handles both base64 payload and route) ---------- */
+(function parseHashOnBootAndRoute(){
   try {
-    const rawHash = (location.hash || '').replace(/^#/,'');
-    if(!rawHash) return;
-    // ignore query-like hash
-    if(rawHash.indexOf('=') !== -1 || rawHash.indexOf('&') !== -1 || rawHash.indexOf('?') === 0) return;
-    const decoded = tryDecodePayloadString(decodeURIComponent(rawHash));
-    if(decoded){
-      // if base64-decoded string is object -> process
-      if(typeof decoded === 'object') processStartPayload(decoded);
+    const p = parseHashRoute();
+    if(!p) return;
+    if(p.mode === 'payload' && p.payload && typeof p.payload === 'object'){
+      processStartPayload(p.payload);
+      return;
     }
-  }catch(e){ console.warn('parseHashPayloadOnBoot err', e); }
+    if(p.mode === 'route'){
+      // route detection for /ad and /task
+      const path = p.path || '';
+      const qp = p.qp || {};
+      if(path.startsWith('/ad')){
+        // route to ad with qp params
+        const ad_id = qp.ad_id || qp.id || qp.ad || null;
+        const secs = qp.secs || qp.s || qp.duration || null;
+        const reward = qp.reward || qp.r || qp.base || null;
+        // create normalized payload and process
+        processStartPayload({ ad_id, secs: secs ? Number(secs) : undefined, reward: reward ? Number(reward) : undefined, vip: qp.vip || qp.vip_level || undefined, user: qp.user ? tryDecodePayloadString(qp.user) : undefined });
+        return;
+      } else if(path.startsWith('/task')){
+        const task_id = qp.task_id || qp.id || null;
+        const secs = qp.secs || qp.s || qp.duration || null;
+        const reward = qp.reward || qp.r || qp.base || null;
+        processStartPayload({ task_id, secs: secs ? Number(secs) : undefined, reward: reward ? Number(reward) : undefined, _source:'route' });
+        return;
+      }
+    }
+  } catch(e){ console.warn('parseHashOnBootAndRoute err', e); }
 })();
 
 /* ---------- message queueing & handshake ---------- */
@@ -428,7 +475,6 @@ async function renderAdFlow(qp){
         try{ postParent({ type:'ad_complete', payload }); }catch(e){ console.warn('postParent ad_complete failed'); }
 
         // If opened directly via deeplink/start param (no parent), send webhook to bot
-        // Determine if opener/parent exists: if no parent or parent === window, treat as deeplink
         const isStandalone = (window.parent === window);
         if(isStandalone){
           try{ sendWebhook({ action:'ads_validate', payload }); }catch(e){ console.warn('webhook send failed', e); }
@@ -474,7 +520,7 @@ async function sendWebhook(data){
     }catch(e){}
     // also check query param ?webhook=
     try{
-      const qp = (function(){ const s = location.search.replace(/^\?/,''); const o={}; s.split('&').filter(Boolean).forEach(p=>{ const i=p.indexOf('='); if(i<0) o[decodeURIComponent(p)]=''; else o[decodeURIComponent(p.slice(0,i))]=decodeURIComponent(p.slice(i+1)); }); return o; })();
+      const qp = parseQP(location.search || '');
       if(qp.webhook) candidates.unshift(qp.webhook);
     }catch(e){}
     const url = candidates.find(Boolean);
@@ -493,16 +539,18 @@ function decodeStart(raw){
 async function router(){
   try{
     // check query param start
-    const qp = (function(){ const s = location.search.replace(/^\?/,''); const obj={}; s.split('&').filter(Boolean).forEach(p=>{ const i=p.indexOf('='); if(i<0) obj[decodeURIComponent(p)]=''; else obj[decodeURIComponent(p.slice(0,i))]=decodeURIComponent(p.slice(i+1)); }); return obj; })();
+    const qp = parseQP(location.search || '');
     if(qp.start){
       const decoded = decodeStart(qp.start);
       if(decoded){ processStartPayload(decoded); return; }
     }
-    // if AUTHORITATIVE payload exists in sessionStorage -> automatically render ad/task if present
+
+    // If hash route contains '/ad' or '/task' or base64 payload, parseHashOnBootAndRoute already handled it on boot.
+    // If authoritative payload exists in sessionStorage -> automatically render ad/task if present
     const auth = (function(){ try{ return JSON.parse(sessionStorage.getItem(KEY_AUTH)||'null'); }catch(e){return null;} })();
     if(auth){
       if(auth.ad_id) { renderAdFlow(auth); return; }
-      if(auth.tasks) { PARENT_TASKS = auth.tasks; renderTasksFromParent(PARENT_TASKS); return; }
+      if(auth.task_id || auth.tasks) { if(auth.tasks) PARENT_TASKS = auth.tasks; if(auth.task_id) awaitRunTaskFlowFromPayload(auth); else renderTasksFromParent(PARENT_TASKS||[]); return; }
     }
     // default: public landing
     showPublicLanding();
