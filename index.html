@@ -42,12 +42,6 @@
   .dbg{position:absolute;left:8px;bottom:8px;padding:6px 8px;background:rgba(0,0,0,0.6);border-radius:6px;font-size:11px;color:#fff;z-index:50;display:none}
   .dbg.dbg-visible{display:block}
   .gaingrid-verified{color:lightgreen;margin-top:6px;font-weight:600;font-size:12px}
-
-  /* landing specific */
-  .landing{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px}
-  .landing h1{margin:0;font-size:18px}
-  .landing .landing-buttons{display:flex;gap:12px}
-  .public-ad-placeholder{width:100%;max-width:468px;height:60px;margin-top:8px;border-radius:8px;background:rgba(255,255,255,0.02);display:flex;align-items:center;justify-content:center}
 </style>
 </head>
 <body>
@@ -70,14 +64,16 @@
 
 <script>
 /* ============================
-   FULL HOSTED HTML (final, public-ready)
-   - Added public landing with Task Board / Ads buttons
-   - AdSense container visible on landing
-   - generateDailyAds only triggered when Ads view is entered (or parent sends start_payload)
-   - All original functions/IDs/names preserved
+   FULL HOSTED HTML (final)
+   - Early message queue & safe processing (ADDED)
+   - Authoritative parent payload handling (tasks & ads)
+   - Randomized daily ads (30/40/50/60) + VIP rewards
+   - AdSense + Adsterra injection (kept)
+   - Preserves all original names, UI, logic
    ============================ */
 
 /* ===== EARLY QUEUE: make sure we never drop a start_payload ===== */
+/* ADDED */
 window.__HOSTED_INCOMING_QUEUE = window.__HOSTED_INCOMING_QUEUE || [];
 window.__HOSTED_IS_READY = false;
 
@@ -138,7 +134,6 @@ function processStartPayload(p){
     // ad
     if(p.ad_id || p.type === 'ad' || p.isAd){
       if(typeof renderAdFlow === 'function'){
-        // ensure ads generated if user is seeing Ads
         renderAdFlow({ ad_id: p.ad_id || p.id, secs: p.secs, reward: p.reward, vip: p.vip || p.vip_level });
         return;
       }
@@ -434,54 +429,6 @@ function setMain(html){ if(el('main')) el('main').innerHTML = html; }
 function setTitle(t){ if(el('hostTitle')) el('hostTitle').textContent = t || 'Hosted view'; }
 function setVIPLabel(){ const qp = combinedQP(); const vip = (qp.vip || qp.vip_level) || (profile && profile.vip_level) || (readLocalProfile() && readLocalProfile().vip_level) || ''; if(el('vipInfo')) el('vipInfo').textContent = vip ? ('VIP: ' + vip) : 'VIP: —'; }
 
-/* ===== PUBLIC LANDING (ADDED) =====
-   - Shows two buttons: Task Board and Ads Center
-   - Shows a visible AdSense placeholder so AdSense crawlers can see an ad slot
-*/
-function renderLanding(){
-  setTitle('GainGrid');
-  setVIPLabel();
-
-  // Landing HTML keeps card UI feel and includes a visible AdSense placeholder
-  const landingHtml = `
-    <div class="landing">
-      <h1>GainGrid — Tasks & Ads</h1>
-      <div class="landing-buttons">
-        <button id="btnTasksPublic" class="btn">🧾 Task Board</button>
-        <button id="btnAdsPublic" class="btn">🎥 Ads Center</button>
-      </div>
-      <div class="small">Open via Gain.web? It will still function the same.</div>
-      <div class="public-ad-placeholder" id="publicAdHolder">
-        <!-- visible AdSense anchor for crawlers -->
-        <ins class="adsbygoogle"
-             style="display:inline-block;width:468px;height:60px"
-             data-ad-client="ca-pub-2309008538670900"
-             data-ad-slot="4194843603"></ins>
-      </div>
-      <div class="small">(Click Ads Center to load ad player and timers.)</div>
-    </div>
-  `;
-  setMain(landingHtml);
-
-  // wire buttons
-  const tbtn = el('btnTasksPublic'), abtn = el('btnAdsPublic');
-  if(tbtn) tbtn.addEventListener('click', ()=> {
-    // open the task board same as deeplink would
-    try{ location.hash = '#/task'; }catch(e){}
-    router();
-  });
-  if(abtn) abtn.addEventListener('click', ()=> {
-    // load ads view (this will call generateDailyAds inside renderAdFlow)
-    try{ location.hash = '#/ad'; }catch(e){}
-    router();
-  });
-
-  // push adsbygoogle on the visible placeholder (so crawler sees it)
-  try{
-    (adsbygoogle = window.adsbygoogle || []).push({});
-  }catch(e){}
-}
-
 /* render task board (kept; prefer PARENT_TASKS if present) */
 async function renderTaskBoard(qp){
   setTitle('Task Board'); setVIPLabel();
@@ -525,8 +472,7 @@ async function renderTaskBoard(qp){
 
 /* ===== RUN TASK FLOW (uses secs/reward passed by UI if present) ===== */
 async function runTaskFlow(opts){
-  // FIX: guard calls to pushView/popView etc. (don't assume they exist)
-  try{ if(typeof pushView === 'function') pushView('task'); }catch(e){}
+  pushView && pushView('task');
   setTitle('Task'); setVIPLabel();
   const taskId = opts.task_id || ('task_' + Math.random().toString(36).slice(2,8));
   const secs = Number(opts.secs || 30);
@@ -576,7 +522,7 @@ async function runTaskFlow(opts){
     postParent({ type:'task_complete', payload });
     postParent({ type:'task_verified', payload });
     note.textContent = 'Task verified. Returning...';
-    try{ if(typeof saveTaskState === 'function') saveTaskState({ date: nowDay(), status: 'completed' }); }catch(e){}
+    saveTaskState && saveTaskState({ date: nowDay(), status: 'completed' });
 
     // Close popup if open and cleanup parent tasks
     try{ if(popup && !popup.closed) popup.close(); }catch(e){}
@@ -639,7 +585,7 @@ async function runTaskFlow(opts){
               cleanup();
               const payload = { task_id: taskId, status: 'unverified_popup_closed', reward:0, base:0, vip_bonus:0, user_id: (profile && profile.user_id) || null };
               postParent({ type:'task_complete', payload });
-              try{ if(typeof saveTaskState === 'function') saveTaskState({ date: nowDay(), status: 'idle' }); }catch(e){}
+              saveTaskState && saveTaskState({ date: nowDay(), status: 'idle' });
               note.textContent = 'Popup closed before verification. Returning...';
               setTimeout(()=> postParent({ type:'close_hosted', reason:'popup_closed', payload }), 700);
             } else {
@@ -661,8 +607,8 @@ async function runTaskFlow(opts){
 
   cancelBtn.addEventListener('click', ()=>{
     postParent({ type:'task_skipped', payload: { task_id: taskId } });
-    try{ if(typeof popView === 'function') popView(); }catch(e){}
-    try{ if(typeof renderTaskBoard === 'function') renderTaskBoard({}); }catch(e){}
+    popView && popView();
+    renderTaskBoard && renderTaskBoard({});
   });
 
   window.addEventListener('beforeunload', ()=> { if(!finished) postParent({ type:'task_incomplete', payload:{ task_id: taskId } }); });
@@ -670,13 +616,10 @@ async function runTaskFlow(opts){
 
 /* ===== AD FLOW: prefers authoritative secs/reward from qp when passed (kept) ===== */
 async function renderAdFlow(qp){
-  try{ if(typeof pushView === 'function') pushView('ad'); }catch(e){}
+  pushView && pushView('ad');
   setTitle('Watch Ad'); setVIPLabel();
 
   const qpCombined = qp || combinedQP();
-
-  // Ensure ad pool exists for this day when Ads view is entered by public or parent
-  try{ generateDailyAds(); }catch(e){ /* safe guard */ }
 
   const passedAdId = qpCombined.ad_id || qpCombined.id || qpCombined.ad || null;
   const passedSecs = Number(qpCombined.secs || qpCombined.s || qpCombined.duration || 0) || null;
@@ -970,34 +913,15 @@ async function router(){
     return;
   }
 
-  // If nothing requested, show public landing (instead of waiting-only message)
-  renderLanding();
+  setMain(`<div class="small">Hosted — waiting for instruction. If parent opened an ad/task it will appear automatically.</div>`);
 }
 
-/* ===== startup: run after DOM ready (FIX: avoid race on immediate execution) ===== */
-// IMPORTANT: do NOT auto-run generateDailyAds on direct open. It will be triggered when Ads view is entered.
-function startHostedBoot(){
-  try{
-    // Start router; router will decide whether to show landing, task board, or ads.
-    router();
-
-    // wire back button to notify parent (FIX: added Close/Back behavior)
-    try{
-      const back = el('backBtn');
-      if(back){
-        back.addEventListener('click', ()=> {
-          postParent({ type:'close_hosted', reason:'user_back' });
-          try{ if(window.close) window.close(); }catch(e){}
-        });
-      }
-    }catch(e){ console.warn('backBtn wire err', e); }
-  }catch(e){ console.warn('hosted boot err', e); }
-}
-if(document.readyState === 'loading'){
-  document.addEventListener('DOMContentLoaded', startHostedBoot);
-} else {
-  startHostedBoot();
-}
+/* start up */
+setTimeout(()=> {
+  generateDailyAds();
+  router();
+}, 120);
+window.addEventListener('hashchange', ()=> router());
 
 /* debug toggle */
 try{ const q = combinedQP(); if(q.dbg === '1'){ el('dbg').classList.add('dbg-visible'); el('dbg').textContent = 'dbg on'; } }catch(e){}
