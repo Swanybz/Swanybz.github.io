@@ -152,18 +152,114 @@ function processStartPayload(payload){
 }
 
 /* ---------- parse hash payload on boot (base64 in hash) ---------- */
+
+/* ===== PATCH: Robust hash & query parsing for gain.web routing =====
+   - Supports: base64-in-hash (old behavior) AND hash route style:
+       #/adview?id=auto_ad_3&secs=40
+       #/task?id=task_12&secs=10
+   - Exposes combinedQP() used across the hosted script
+*/
+
+function qsParse(s){
+  if(!s) return {};
+  return s.replace(/^\?/,'').split('&').filter(Boolean).reduce((o,p)=>{
+    const i = p.indexOf('=');
+    if(i < 0) { o[decodeURIComponent(p)] = ''; }
+    else {
+      const k = decodeURIComponent(p.slice(0,i));
+      const v = decodeURIComponent(p.slice(i+1));
+      // handle repeated keys
+      if(o[k] === undefined) o[k] = v;
+      else if(Array.isArray(o[k])) o[k].push(v);
+      else o[k] = [o[k], v];
+    }
+    return o;
+  }, {});
+}
+
+function getHashQP(){
+  if(!location.hash) return {};
+  // hash structure can be:
+  //   #<base64>                -> handled separately
+  //   #/adview?id=...&secs=..  -> typical gain.web
+  const h = location.hash.replace(/^#/,'');
+  const parts = h.split('?'); // splits "/adview" and "id=..."
+  const qs = parts[1] || '';
+  return qsParse(qs);
+}
+
+function getSearchQP(){
+  const s = location.search || '';
+  return qsParse(s.replace(/^\?/,''));
+}
+
+function combinedQP(){
+  // hash query takes precedence over search params (keeps compatibility)
+  return Object.assign({}, getSearchQP(), getHashQP());
+}
+
+/* replace older parseHashPayloadOnBoot with new behavior:
+   - If hash looks like base64 payload (no '=' or '&' and decodes to object) -> processStartPayload
+   - If hash contains route like '/ad' or '/adview' with id -> call renderAdFlow
+   - If hash contains '/task' with id -> awaitRunTaskFlowFromPayload
+*/
 (function parseHashPayloadOnBoot(){
   try {
-    const h = (location.hash || '').replace(/^#/,'');
-    if(!h) return;
-    // ignore query-like hash (#/?a=b)
-    if(h.indexOf('=') !== -1 || h.indexOf('&') !== -1 || h.indexOf('?') === 0) return;
-    const decoded = tryDecodePayloadString(decodeURIComponent(h));
-    if(decoded && typeof decoded === 'object'){
-      processStartPayload(decoded);
+    const rawHash = (location.hash || '').replace(/^#/,'');
+    if(!rawHash) return;
+
+    // 1) If it looks like a base64 start payload (no typical query separators), try decode
+    if(rawHash.indexOf('=') === -1 && rawHash.indexOf('&') === -1 && rawHash.indexOf('?') !== 0){
+      const decoded = tryDecodePayloadString(decodeURIComponent(rawHash));
+      if(decoded && typeof decoded === 'object'){
+        processStartPayload(decoded);
+        return;
+      }
     }
-  } catch(e){ console.warn('parseHashPayloadOnBoot', e); }
+
+    // 2) Otherwise, try to parse route-style hash (e.g. "#/adview?id=auto_ad_3")
+    const h = rawHash.toLowerCase();
+    const hashQP = getHashQP();
+
+    // ad route detection (covers /ad, /adview, /watch, etc.)
+    if(h.includes('/ad') || h.includes('/adview') || h.includes('/watch')){
+      const adId = hashQP.id || hashQP.ad_id || hashQP.ad;
+      if(adId){
+        // Build a payload-like object so processStartPayload can handle it consistently
+        const p = {
+          ad_id: adId,
+          secs: hashQP.secs || hashQP.s || undefined,
+          reward: hashQP.reward || hashQP.r || undefined,
+          vip_level: hashQP.vip || hashQP.vip_level || undefined,
+          user: hashQP.user ? tryDecodePayloadString(hashQP.user) : undefined
+        };
+        // store authoritative payload and route
+        try { sessionStorage.setItem('gg_hosted_authoritative_payload', JSON.stringify(p)); } catch(e){}
+        // prefer to call renderAdFlow directly (keeps UX consistent)
+        try { renderAdFlow({ ad_id: p.ad_id, secs: Number(p.secs) || undefined, reward: Number(p.reward) || undefined, vip: p.vip_level, user: p.user }); } catch(e){ processStartPayload(p); }
+        return;
+      }
+    }
+
+    // task route detection
+    if(h.includes('/task') || h.includes('/tasks')){
+      const taskId = hashQP.id || hashQP.task_id || hashQP.task;
+      if(taskId){
+        const tp = {
+          task_id: taskId,
+          secs: hashQP.secs || hashQP.s || undefined,
+          reward: hashQP.reward || hashQP.r || undefined,
+          url: hashQP.url || undefined
+        };
+        try { sessionStorage.setItem('gg_hosted_authoritative_payload', JSON.stringify(tp)); } catch(e){}
+        try { awaitRunTaskFlowFromPayload(tp); } catch(e){ processStartPayload(tp); }
+        return;
+      }
+    }
+
+  } catch(e){ console.warn('parseHashPayloadOnBoot err', e); }
 })();
+
 
 /* ---------- queued messages before ready ---------- */
 window.__HOSTED_INCOMING_QUEUE = window.__HOSTED_INCOMING_QUEUE || [];
