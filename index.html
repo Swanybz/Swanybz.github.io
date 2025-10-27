@@ -6,28 +6,37 @@
 <title>GainGrid Hosted — Tasks & Ads (iframe-ready)</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 
-<!-- AdSense core (kept visible for review) -->
+<!-- AdSense (kept visible for review) -->
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2309008538670900"
      crossorigin="anonymous"></script>
 
 <style>
-  :root{ --card-w:420px; --card-h:680px; }
-  *{box-sizing:border-box}
-  html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial;color:#fff;background:linear-gradient(135deg,#0f1419 0,#1a2332 50%,#0d1117 100%);}
+  :root{
+    --accent1:#ff6b9d; --accent2:#c471ed;
+    --bg:linear-gradient(135deg,#0f1419 0,#1a2332 50%,#0d1117 100%);
+  }
+  *,*::before,*::after{box-sizing:border-box}
+  html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial;color:#fff;background:var(--bg)}
   .viewport-wrap{width:100%;height:100vh;display:flex;align-items:center;justify-content:center;padding:12px}
-  .card{width:var(--card-w);height:var(--card-h);background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));padding:14px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);box-shadow:0 10px 30px rgba(0,0,0,0.5);display:flex;flex-direction:column;overflow:hidden}
+  .card{width:var(--card-width,420px);height:var(--card-height,620px);background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));padding:14px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);box-shadow:0 10px 30px rgba(0,0,0,0.5);display:flex;flex-direction:column;overflow:hidden}
   .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex:0 0 auto}
   .back-btn{background:transparent;border:0;color:rgba(255,255,255,0.9);cursor:pointer;font-weight:700}
   h2{margin:0;font-size:16px}
   .small{font-size:12px;color:rgba(255,255,255,0.78)}
-  .btn{padding:8px 10px;border-radius:8px;background:linear-gradient(45deg,#ff6b9d,#c471ed);border:none;color:#fff;cursor:pointer;font-weight:700}
+  .btn{padding:8px 10px;border-radius:8px;background:linear-gradient(45deg,var(--accent1),var(--accent2));border:none;color:#fff;cursor:pointer;font-weight:700}
   .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06)}
   .content{flex:1 1 auto;overflow:hidden;display:flex;flex-direction:column}
-  .ad-player{width:100%;height:var(--ad-height,320px);border-radius:8px;overflow:hidden;background:#000;display:flex;align-items:center;justify-content:center;position:relative;margin-top:12px}
-  .countdown{font-weight:700;font-size:20px;color:#fff}
+  .task-list{display:flex;flex-direction:column;gap:10px;margin:8px 0;overflow:auto;padding-right:6px}
+  .card-item{width:100%;padding:10px;border-radius:8px;background:rgba(255,255,255,0.02);display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px;}
+  .ad-player{width:100%;height:var(--ad-height,260px);border-radius:8px;overflow:hidden;background:#000;display:flex;align-items:center;justify-content:center;position:relative;margin-top:12px}
+  .note{margin-top:8px;color:rgba(255,255,255,0.6);font-size:12px}
+  .countdown{font-weight:700;font-size:18px;color:#fff}
   .hidden{display:none}
-  #hostedDbg{position:absolute;right:10px;bottom:10px;padding:6px 8px;background:rgba(0,0,0,0.6);border-radius:6px;font-size:12px;pointer-events:none;color:#fff;z-index:999}
+  #adPlayerAdsenseHolder, #taskBanner, #adsterBannerHolder{display:flex;justify-content:center;align-items:center}
+  .dbg{position:absolute;left:8px;bottom:8px;padding:6px 8px;background:rgba(0,0,0,0.6);border-radius:6px;font-size:11px;color:#fff;z-index:50;display:none}
+  .dbg.dbg-visible{display:block}
   .landing-buttons{display:flex;flex-direction:column;gap:12px;align-items:center;justify-content:center;margin-top:8px}
+  .gaingrid-verified{color:lightgreen;margin-top:6px;font-weight:600;font-size:12px}
 </style>
 </head>
 <body>
@@ -37,7 +46,6 @@
         <button id="backBtn" class="back-btn">← Back</button>
         <div style="text-align:right">
           <div class="small" id="vipInfo">VIP: —</div>
-          <div class="small" id="profileName">Guest</div>
         </div>
       </div>
 
@@ -45,45 +53,56 @@
         <div id="main" class="small">Initializing…</div>
       </div>
 
-      <div id="hostedDbg">hosted:init</div>
+      <div class="dbg" id="hostedDbg">hosted:init</div>
     </div>
   </div>
 
 <script>
-/* ===========================
-   Hosted page — full integration
-   Supports: Public AdSense demo, Gain.Web payload (hash/postMessage), Deeplink bypass
-   - Handshake: posts hosted_ready (includes ad_id if known)
-   - Waits countdown, posts ad_complete to parent and to bot webhook
-   - Stores authoritative payload in sessionStorage and clears after validate
+/* ============================
+   Hosted: Public + Gain.Web integration
+   - hash/postMessage/start param handling
+   - authoritative payload stored at 'gg_hosted_authoritative_payload'
+   - posts 'hosted_ready' and 'ad_complete' to parent
+   - posts to BOT webhook on deeplink/direct calls
    ============================ */
 
 /* ---------- CONFIG ---------- */
-const BOT_WEBHOOK = "https://gaingrid.bots.business/onWebhook"; // provided bot webhook
+const HOSTED_ORIGIN = "https://swanybz.github.io/"; // keep same domain (used by parent)
+const HOSTED_BASE = HOSTED_ORIGIN + "#";
+const BOT_WEBHOOK = "https://gaingrid.bots.business/onWebhook"; // deeplink/direct webhook (change if needed)
 const ADSENSE_CLIENT = "ca-pub-2309008538670900";
-const HOSTED_DEBUG = true;
+const AD_DURATIONS = [30,40,50,60];
+const KEY_AUTH = 'gg_hosted_authoritative_payload';
+const KEY_PROFILE = 'gg_hosted_profile';
 
 /* ---------- small utilities ---------- */
 const el = id => document.getElementById(id);
-function logd(...a){ if(HOSTED_DEBUG) console.log('[hosted]', ...a); try{ if(HOSTED_DEBUG && el('hostedDbg')) el('hostedDbg').textContent = Array.from(a).slice(0,2).join(' ').slice(0,40); }catch(e){} }
-function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
-function randInt(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+function logd(){ try{ if(window.console && console.log) console.log.apply(console, ['hosted:', ...arguments]); if(el('hostedDbg')) el('hostedDbg').textContent = String(arguments[0]).slice(0,30); }catch(e){} }
 function setMain(html){ if(el('main')) el('main').innerHTML = html; }
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+function escapeHtml(s){ if(!s && s!==0) return ''; return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-/* ---------- storage keys ---------- */
-const KEY_AUTH = 'gg_hosted_authoritative_payload';
-const KEY_PROFILE = 'gg_hosted_profile';
-const AD_DURATIONS = [30,40,50,60];
+/* ---------- profile apply ---------- */
+let profile = null;
+function applyUserData(u){
+  try{
+    if(!u) return;
+    profile = Object.assign({}, profile || {}, u);
+    if(el('vipInfo')) el('vipInfo').textContent = profile.vip_level ? ('VIP: ' + profile.vip_level) : 'VIP: —';
+    if(el('hostedDbg')) el('hostedDbg').textContent = 'hosted:profile';
+    try{ sessionStorage.setItem(KEY_PROFILE, JSON.stringify(profile)); }catch(e){}
+  }catch(e){ console.warn('applyUserData err', e); }
+}
 
-/* ---------- helpers to decode base64/hash payloads ---------- */
+/* ---------- helper: decode base64/hash payload ---------- */
 function tryDecodePayloadString(raw){
   if(!raw) return null;
   try {
-    // try url-encoded JSON first
-    if(raw.startsWith('%7B') || raw.startsWith('%5B') || raw.indexOf('%22')!==-1){
-      try{ return JSON.parse(decodeURIComponent(raw)); }catch(e){}
+    // URL-encoded JSON first
+    if(raw.indexOf('%7B') === 0 || raw.indexOf('%5B') === 0 || raw.indexOf('%22') !== -1){
+      try { return JSON.parse(decodeURIComponent(raw)); } catch(e){}
     }
-    // normalize URL-safe base64
+    // Normalize URL-safe base64
     let norm = raw.replace(/\s+/g,'').replace(/-/g,'+').replace(/_/g,'/');
     const pad = norm.length % 4;
     if(pad === 2) norm += '=='; else if(pad === 3) norm += '=';
@@ -94,45 +113,24 @@ function tryDecodePayloadString(raw){
   } catch(err){ console.warn('tryDecodePayloadString err', err); return null; }
 }
 
-/* ---------- profile/UI helpers (in-frame applyUserData) ---------- */
-let profile = null;
-function applyUserData(u){
-  try {
-    if(!u) return;
-    profile = Object.assign({}, profile || {}, u);
-    if(el('profileName')) el('profileName').textContent = u.username ? ("@" + u.username) : (u.first_name || "Guest");
-    if(el('vipInfo')) el('vipInfo').textContent = u.vip_level ? ("VIP: " + u.vip_level) : 'VIP: —';
-    try { sessionStorage.setItem(KEY_PROFILE, JSON.stringify(profile)); } catch(e){}
-  } catch(e){ console.warn('applyUserData', e); }
-}
-
-/* ---------- clear stored payloads ---------- */
-function clearStartPayload(){
-  try { sessionStorage.removeItem(KEY_AUTH); } catch(e){}
-  try { sessionStorage.removeItem(KEY_PROFILE); } catch(e){}
-  profile = null;
-  try { if(el('vipInfo')) el('vipInfo').textContent = 'VIP: —'; } catch(e){}
-  logd('cleared payload');
-}
-
-/* ---------- process incoming authoritative payload (central) ---------- */
+/* ---------- central payload processor ---------- */
 function processStartPayload(payload){
-  try {
+  try{
     if(!payload || typeof payload !== 'object') return;
-    // Save authoritative payload
-    try { sessionStorage.setItem(KEY_AUTH, JSON.stringify(payload)); } catch(e){}
-    // apply profile if provided
+    // store authoritative copy
+    try{ sessionStorage.setItem(KEY_AUTH, JSON.stringify(payload)); }catch(e){}
+    // apply profile if present
     if(payload.user && typeof payload.user === 'object') applyUserData(payload.user);
     else if(payload.profile) applyUserData(payload.profile);
-    // if tasks provided -> render tasks
+    // tasks array
     if(Array.isArray(payload.tasks) && payload.tasks.length){
+      // keep minimal rendering for parent-provided tasks
       PARENT_TASKS = payload.tasks.map(t => ({ id: t.id || t.task_id, title: t.title || t.name, secs: t.secs||t.duration||30, reward: t.reward||t.base||0, url: t.url||t.link||'' }));
       renderTasksFromParent(PARENT_TASKS);
       return;
     }
-    // if ad request -> render ad flow
+    // ad open
     if(payload.ad_id || payload.id || payload.type === 'ad' || payload.isAd){
-      // ensure we have proper fields
       const ad = {
         ad_id: payload.ad_id || payload.id,
         secs: Number(payload.secs || payload.s || payload.duration) || null,
@@ -140,150 +138,53 @@ function processStartPayload(payload){
         vip_level: payload.vip_level || payload.vip || null,
         user: payload.user || payload
       };
-      // store last ad payload for UI
-      try { sessionStorage.setItem('gg_hosted_last_ad_payload', JSON.stringify(ad)); } catch(e){}
-      // route to ad flow
+      try{ sessionStorage.setItem('gg_hosted_last_ad_payload', JSON.stringify(ad)); }catch(e){}
       renderAdFlow({ ad_id: ad.ad_id, secs: ad.secs, reward: ad.reward, vip: ad.vip_level, user: ad.user });
       return;
     }
-    // else: store and show landing
-    setMain('<div class="small">Payload stored. Use UI to start ad/task.</div>');
-  } catch(err){ console.warn('processStartPayload err', err); }
+    // otherwise show landing message
+    setMain('<div class="small">Payload received and stored. Use UI to start ad/task.</div>');
+  }catch(e){ console.warn('processStartPayload err', e); }
 }
 
-/* ---------- parse hash payload on boot (base64 in hash) ---------- */
-
-/* ===== PATCH: Robust hash & query parsing for gain.web routing =====
-   - Supports: base64-in-hash (old behavior) AND hash route style:
-       #/adview?id=auto_ad_3&secs=40
-       #/task?id=task_12&secs=10
-   - Exposes combinedQP() used across the hosted script
-*/
-
-function qsParse(s){
-  if(!s) return {};
-  return s.replace(/^\?/,'').split('&').filter(Boolean).reduce((o,p)=>{
-    const i = p.indexOf('=');
-    if(i < 0) { o[decodeURIComponent(p)] = ''; }
-    else {
-      const k = decodeURIComponent(p.slice(0,i));
-      const v = decodeURIComponent(p.slice(i+1));
-      // handle repeated keys
-      if(o[k] === undefined) o[k] = v;
-      else if(Array.isArray(o[k])) o[k].push(v);
-      else o[k] = [o[k], v];
-    }
-    return o;
-  }, {});
-}
-
-function getHashQP(){
-  if(!location.hash) return {};
-  // hash structure can be:
-  //   #<base64>                -> handled separately
-  //   #/adview?id=...&secs=..  -> typical gain.web
-  const h = location.hash.replace(/^#/,'');
-  const parts = h.split('?'); // splits "/adview" and "id=..."
-  const qs = parts[1] || '';
-  return qsParse(qs);
-}
-
-function getSearchQP(){
-  const s = location.search || '';
-  return qsParse(s.replace(/^\?/,''));
-}
-
-function combinedQP(){
-  // hash query takes precedence over search params (keeps compatibility)
-  return Object.assign({}, getSearchQP(), getHashQP());
-}
-
-/* replace older parseHashPayloadOnBoot with new behavior:
-   - If hash looks like base64 payload (no '=' or '&' and decodes to object) -> processStartPayload
-   - If hash contains route like '/ad' or '/adview' with id -> call renderAdFlow
-   - If hash contains '/task' with id -> awaitRunTaskFlowFromPayload
-*/
+/* ---------- parse payload from hash on boot ---------- */
 (function parseHashPayloadOnBoot(){
   try {
     const rawHash = (location.hash || '').replace(/^#/,'');
     if(!rawHash) return;
-
-    // 1) If it looks like a base64 start payload (no typical query separators), try decode
-    if(rawHash.indexOf('=') === -1 && rawHash.indexOf('&') === -1 && rawHash.indexOf('?') !== 0){
-      const decoded = tryDecodePayloadString(decodeURIComponent(rawHash));
-      if(decoded && typeof decoded === 'object'){
-        processStartPayload(decoded);
-        return;
-      }
+    // ignore query-like hash
+    if(rawHash.indexOf('=') !== -1 || rawHash.indexOf('&') !== -1 || rawHash.indexOf('?') === 0) return;
+    const decoded = tryDecodePayloadString(decodeURIComponent(rawHash));
+    if(decoded){
+      // if base64-decoded string is object -> process
+      if(typeof decoded === 'object') processStartPayload(decoded);
     }
-
-    // 2) Otherwise, try to parse route-style hash (e.g. "#/adview?id=auto_ad_3")
-    const h = rawHash.toLowerCase();
-    const hashQP = getHashQP();
-
-    // ad route detection (covers /ad, /adview, /watch, etc.)
-    if(h.includes('/ad') || h.includes('/adview') || h.includes('/watch')){
-      const adId = hashQP.id || hashQP.ad_id || hashQP.ad;
-      if(adId){
-        // Build a payload-like object so processStartPayload can handle it consistently
-        const p = {
-          ad_id: adId,
-          secs: hashQP.secs || hashQP.s || undefined,
-          reward: hashQP.reward || hashQP.r || undefined,
-          vip_level: hashQP.vip || hashQP.vip_level || undefined,
-          user: hashQP.user ? tryDecodePayloadString(hashQP.user) : undefined
-        };
-        // store authoritative payload and route
-        try { sessionStorage.setItem('gg_hosted_authoritative_payload', JSON.stringify(p)); } catch(e){}
-        // prefer to call renderAdFlow directly (keeps UX consistent)
-        try { renderAdFlow({ ad_id: p.ad_id, secs: Number(p.secs) || undefined, reward: Number(p.reward) || undefined, vip: p.vip_level, user: p.user }); } catch(e){ processStartPayload(p); }
-        return;
-      }
-    }
-
-    // task route detection
-    if(h.includes('/task') || h.includes('/tasks')){
-      const taskId = hashQP.id || hashQP.task_id || hashQP.task;
-      if(taskId){
-        const tp = {
-          task_id: taskId,
-          secs: hashQP.secs || hashQP.s || undefined,
-          reward: hashQP.reward || hashQP.r || undefined,
-          url: hashQP.url || undefined
-        };
-        try { sessionStorage.setItem('gg_hosted_authoritative_payload', JSON.stringify(tp)); } catch(e){}
-        try { awaitRunTaskFlowFromPayload(tp); } catch(e){ processStartPayload(tp); }
-        return;
-      }
-    }
-
-  } catch(e){ console.warn('parseHashPayloadOnBoot err', e); }
+  }catch(e){ console.warn('parseHashPayloadOnBoot err', e); }
 })();
 
-
-/* ---------- queued messages before ready ---------- */
+/* ---------- message queueing & handshake ---------- */
 window.__HOSTED_INCOMING_QUEUE = window.__HOSTED_INCOMING_QUEUE || [];
 window.__HOSTED_IS_READY = false;
 
-/* ---------- early message queue handler (keeps) ---------- */
 window.addEventListener('message', function __earlyHostQueue(ev){
   try{
     const d = ev && ev.data;
     if(!d) return;
-    // ping handler for parent testing
+    // ping
     if(d.type === 'ping_hosted'){
-      try { (ev.source && ev.source.postMessage) && ev.source.postMessage({ type: 'hosted_pong', payload:{ ts: Date.now() } }, '*'); }catch(e){}
+      try{ (ev.source && ev.source.postMessage) && ev.source.postMessage({ type: 'hosted_pong', payload:{ ts: Date.now() } }, '*'); }catch(e){}
       return;
     }
+    // normalize start payload / open_task / open_ad
     if(d.type === 'start_payload' || d.type === 'open_task' || d.type === 'open_ad'){
-      let normalized = { type:'start_payload', payload: {} };
+      let normalized = { type:'start_payload', payload:{} };
       if(d.type === 'start_payload') normalized = d;
       else normalized.payload = d.payload || d;
       if(!window.__HOSTED_IS_READY){
         window.__HOSTED_INCOMING_QUEUE.push(normalized);
         return;
       }
-      processStartPayload(normalized.payload);
+      processStartPayload(normalized.payload || {});
       return;
     }
     if(!window.__HOSTED_IS_READY){
@@ -293,14 +194,13 @@ window.addEventListener('message', function __earlyHostQueue(ev){
   }catch(err){ console.warn('earlyHostQueue err', err); }
 }, false);
 
-/* ---------- helper to post to parent ---------- */
 function postParent(msg){
   try{ if(window.parent && window.parent !== window) window.parent.postMessage(msg, '*'); }catch(e){}
   try{ if(window.opener && !window.opener.closed) window.opener.postMessage(msg, '*'); }catch(e){}
   logd('postParent', msg.type || msg);
 }
 
-/* ---------- consume queued messages ---------- */
+/* consume queued messages */
 function _consumeQueuedMessages(){
   try{
     while(window.__HOSTED_INCOMING_QUEUE && window.__HOSTED_INCOMING_QUEUE.length){
@@ -314,51 +214,42 @@ function _consumeQueuedMessages(){
   }catch(e){ console.warn('consume queue error', e); }
 }
 
-/* ---------- announce ready (handshake) ---------- */
+/* announce ready (handshake) */
 function announceReady(){
   try{
     window.__HOSTED_IS_READY = true;
     _consumeQueuedMessages();
-    // include ad_id if present in stored authoritative payload
+    // include ad_id if present
     let auth = null;
     try { auth = JSON.parse(sessionStorage.getItem(KEY_AUTH) || 'null'); } catch(e){ auth = null; }
     const payload = { ts: Date.now() };
     if(auth && (auth.ad_id || auth.id)) payload.ad_id = (auth.ad_id || auth.id);
     postParent({ type: 'hosted_ready', payload });
-    logd('announceReady', payload);
     if(el('hostedDbg')) el('hostedDbg').textContent = 'hosted:ready' + (payload.ad_id ? ' ad:' + payload.ad_id : '');
-  } catch(e){ console.warn('announceReady failed', e); }
+    logd('announceReady', payload);
+  }catch(e){ console.warn('announceReady failed', e); }
 }
 if(document.readyState === 'complete' || document.readyState === 'interactive') setTimeout(announceReady, 60);
 else document.addEventListener('DOMContentLoaded', ()=> setTimeout(announceReady, 60));
 
-/* ---------- global message handler (main) ---------- */
+/* ---------- global message handler ---------- */
 window.addEventListener('message', function(ev){
   try{
     const d = ev.data || {};
     if(!d || typeof d !== 'object') return;
     logd('msg', d.type);
-
     if(d.type === 'profile_response' && d.payload){ applyUserData(d.payload); return; }
-
-    if(d.type === 'start_payload' && d.payload){
-      try { processStartPayload(d.payload); } catch(e){ console.warn('processStartPayload msg err', e); }
-      return;
-    }
-
+    if(d.type === 'start_payload' && d.payload){ processStartPayload(d.payload); return; }
     if(d.type === 'open_ad' && d.payload && d.payload.ad_id){
       try{ sessionStorage.setItem(KEY_AUTH, JSON.stringify(d.payload)); }catch(e){}
-      // route to ad view
       renderAdFlow({ ad_id: d.payload.ad_id, secs: d.payload.secs, reward: d.payload.reward, vip: d.payload.vip, user: d.payload.user });
       return;
     }
-
     if(d.type === 'open_task' && d.payload && d.payload.task_id){
       try{ sessionStorage.setItem(KEY_AUTH, JSON.stringify(d.payload)); }catch(e){}
       awaitRunTaskFlowFromPayload(d.payload);
       return;
     }
-
     if(d.type === 'close_hosted' || d.type === 'request_close'){
       try{ if(window.close) window.close(); }catch(e){}
       return;
@@ -366,35 +257,64 @@ window.addEventListener('message', function(ev){
   }catch(e){ console.warn('hosted message err', e); }
 });
 
-/* ---------- PARENT TASKS / UI (kept minimal) ---------- */
+/* ---------- public landing UI (AdSense visible) ---------- */
+function showPublicLanding(){
+  setMain(`<div style="text-align:center">
+    <h2 style="margin:0 0 6px 0">GainGrid — Public Preview</h2>
+    <div class="small">Open demo for AdSense & testers. Choose a section:</div>
+    <div class="landing-buttons">
+      <button id="landingTasks" class="btn big">🧾 Task Board</button>
+      <button id="landingAds" class="btn big">🎥 Ads Center</button>
+    </div>
+    <div style="margin-top:12px;text-align:center">
+      <div id="adPlayerAdsenseHolder" style="margin:8px auto;max-width:468px">
+        <ins class="adsbygoogle"
+             style="display:inline-block;width:468px;height:60px"
+             data-ad-client="${ADSENSE_CLIENT}"
+             data-ad-slot="4194843603"></ins>
+      </div>
+      <div class="small" style="margin-top:8px">Ads preview area — GainsGrid public mode</div>
+    </div>
+  </div>`);
+  try{ (adsbygoogle = window.adsbygoogle || []).push({}); }catch(e){}
+  setTimeout(()=>{
+    const lt = el('landingTasks'), la = el('landingAds');
+    if(lt) lt.addEventListener('click', ()=> { routerTo('task'); });
+    if(la) la.addEventListener('click', ()=> { routerTo('ad'); });
+  },40);
+}
+
+/* ---------- router helpers ---------- */
+function routerTo(section){
+  if(section === 'ad') renderAdFlow({});
+  else if(section === 'task') renderTaskBoard({});
+}
+
+/* ---------- task board minimal ---------- */
 let PARENT_TASKS = null;
-function renderTasksFromParent(tasks){
+async function renderTasksFromParent(tasks){
   try{
     PARENT_TASKS = Array.isArray(tasks) ? tasks.slice() : [];
-    if(!PARENT_TASKS.length){ setMain('<div class="small">No tasks provided by parent.</div>'); return; }
-    const html = PARENT_TASKS.map(t=>`<div class="card-item"><div><strong>${escapeHtml(t.title||t.name||'Task')}</strong><div class="small">${t.secs||30}s · ${t.reward||0} G</div></div><div><button class="btn" data-id="${t.id}">Do</button></div></div>`).join('');
-    setMain(`<div class="small">Tasks</div><div style="margin-top:8px">${html}</div>`);
+    if(!PARENT_TASKS.length){ setMain(`<div class="small">No tasks provided by parent.</div>`); return; }
+    const html = PARENT_TASKS.map(t=>{
+      const id = t.id || t.task_id || ('task_' + Math.random().toString(36).slice(2,8));
+      return `<div class="card-item" role="article" data-task-id="${id}">
+        <div class="left"><strong>${escapeHtml(t.title||t.name||('Task ' + id))}</strong><div class="meta small">${(t.secs||30)}s · Reward ${t.reward||0} G</div></div>
+        <div style="flex-shrink:0"><button class="btn do-task" data-id="${encodeURIComponent(id)}">Do</button></div>
+      </div>`;
+    }).join('');
+    setMain(`<div class="small">Tasks provided by parent</div><div class="task-list">${html}</div>`);
+    Array.from(document.querySelectorAll('.do-task')).forEach(b=>{
+      b.addEventListener('click', ()=> {
+        const id = decodeURIComponent(b.getAttribute('data-id'));
+        const match = (PARENT_TASKS||[]).find(t=> (t.id || t.task_id) === id);
+        if(match) awaitRunTaskFlowFromPayload({ task_id: id, secs: match.secs || 30, reward: match.reward || 0, url: match.url || '' });
+      });
+    });
   }catch(e){ console.warn('renderTasksFromParent', e); setMain('<div class="small">Unable to render tasks.</div>'); }
 }
-function escapeHtml(s){ if(!s && s!==0) return ''; return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-/* ---------- small UI: public landing ---------- */
-function showPublicLanding(){
-  setMain(`<div style="text-align:center"><h2 style="margin:0">GainGrid — Public Preview</h2><div class="small">Ads & demo UI for reviewers</div><div class="landing-buttons"><button id="landingTasks" class="btn big">🧾 Task Board</button><button id="landingAds" class="btn big">🎥 Ads Center</button></div><div style="margin-top:10px;text-align:center"><div id="adPlayerAdsenseHolder" style="max-width:468px;margin:0 auto"><ins class="adsbygoogle" style="display:inline-block;width:468px;height:60px" data-ad-client="${ADSENSE_CLIENT}" data-ad-slot="4194843603"></ins></div></div></div>`);
-  try{ (adsbygoogle = window.adsbygoogle || []).push({}); }catch(e){}
-  setTimeout(()=>{ const a = document.getElementById('landingAds'); if(a) a.addEventListener('click', ()=> { renderAdFlow({ ad_id:'public_demo', secs: randInt(AD_DURATIONS), reward:0, vip:'none' }); }); const t=document.getElementById('landingTasks'); if(t) t.addEventListener('click', ()=>{ renderTaskBoard({}); }); },40);
-}
-
-/* ---------- TASK BOARD (kept minimal) ---------- */
-async function renderTaskBoard(qp){
-  setMain('<div class="small">Loading tasks…</div>');
-  // fallback demo tasks
-  const demo = [{ id:'demo1', title:'Demo — Visit Example', secs:10, reward:0, url:'https://example.com' }, { id:'demo2', title:'Demo — Read Help', secs:8, reward:0, url:'https://example.com' }];
-  PARENT_TASKS = demo;
-  renderTasksFromParent(PARENT_TASKS);
-}
-
-/* ---------- runTaskFlow (kept minimal) ---------- */
+/* ---------- runTaskFlow (kept simple) ---------- */
 async function awaitRunTaskFlowFromPayload(p){
   try{
     const id = p.task_id || p.id || ('task_' + Math.random().toString(36).slice(2,8));
@@ -405,122 +325,187 @@ async function awaitRunTaskFlowFromPayload(p){
   }catch(e){ console.warn('awaitRunTaskFlowFromPayload', e); }
 }
 async function runTaskFlow(opts){
-  setMain(`<div class="small">Task ${escapeHtml(opts.task_id||'')} — open target and stay ${opts.secs||30}s.</div><div style="margin-top:12px"><button id="openBtn" class="btn">Open & Start</button></div><div id="taskNote" class="small" style="margin-top:10px"></div>`);
-  const openBtn = document.getElementById('openBtn');
+  setMain(`<div class="small">Task ${escapeHtml(opts.task_id||'')} — open target and stay ${opts.secs||30}s.</div>
+    <div style="margin-top:12px;display:flex;gap:8px;justify-content:center"><button id="openBtn" class="btn">Open & Start</button><button id="cancelBtn" class="btn ghost">Cancel</button></div>
+    <div id="taskNote" class="small" style="margin-top:12px"></div>`);
+  const openBtn = el('openBtn'), cancelBtn = el('cancelBtn'), note = el('taskNote');
   let finished=false, expectedEnd=null, popup=null;
-  openBtn.addEventListener('click', ()=>{
-    expectedEnd = Date.now() + (opts.secs||30)*1000;
-    try{ popup = window.open(opts.url || '#','_blank'); } catch(e){ popup = null; }
-    document.addEventListener('visibilitychange', function vc(){ if(document.visibilityState === 'visible' && Date.now() >= expectedEnd && !finished){ finished=true; finalize(); }});
-    setTimeout(()=>{ if(!finished){ finished=true; finalize(); } }, (opts.secs||30)*1000 + 3000);
-  });
   function finalize(){
+    if(finished) return;
+    finished = true;
     const payload = { task_id: opts.task_id, reward: opts.reward || 0, vip_level: (profile && profile.vip_level) || null, user_id: (profile && profile.user_id) || null, status:'completed' };
-    postParent({ type:'task_complete', payload }); postParent({ type:'task_verified', payload });
-    // clear
-    try{ clearStartPayload(); }catch(e){}
-    setTimeout(()=> postParent({ type:'close_hosted', reason:'task_done', payload }),700);
+    postParent({ type:'task_complete', payload });
+    postParent({ type:'task_verified', payload });
+    setMain('<div class="small">Task verified. Returning...</div>');
+    try{ sessionStorage.removeItem(KEY_AUTH); sessionStorage.removeItem(KEY_PROFILE); }catch(e){}
+    setTimeout(()=> { postParent({ type:'close_hosted', reason:'task_done', payload }); try{ if(window.close) window.close(); }catch(e){} }, 700);
   }
+  openBtn.addEventListener('click', ()=>{
+    cancelBtn.style.display='none'; openBtn.disabled=true; note.textContent = `Opening — please remain ${opts.secs}s...`;
+    expectedEnd = Date.now() + (opts.secs||30)*1000;
+    try{ popup = window.open(opts.url || '#', '_blank', 'noopener'); }catch(e){ popup=null; }
+    if(popup){
+      const poll = setInterval(()=> {
+        try{
+          if(popup.closed && !finished){
+            clearInterval(poll);
+            if(Date.now() < expectedEnd){
+              finished = true;
+              postParent({ type:'task_complete', payload: { task_id: opts.task_id, status:'unverified_popup_closed' } });
+              setMain('<div class="small">Popup closed too early. Returning...</div>');
+              setTimeout(()=> postParent({ type:'close_hosted', reason:'popup_closed' }),700);
+            } else finalize();
+          }
+        }catch(e){}
+      },700);
+    } else {
+      // fallback timer
+      setTimeout(()=> finalize(), (opts.secs||30)*1000 + 3000);
+    }
+  });
+  cancelBtn.addEventListener('click', ()=> { postParent({ type:'task_skipped', payload:{ task_id: opts.task_id } }); routerTo('task'); });
+  window.addEventListener('beforeunload', ()=> { if(!finished) postParent({ type:'task_incomplete', payload:{ task_id: opts.task_id } }); });
 }
 
 /* ---------- AD FLOW (core) ---------- */
-let adTimerInterval = null;
+let adTick = null;
 async function renderAdFlow(qp){
-  try{ // settle qp from session or function arg
-    const auth = (function(){ try{ return JSON.parse(sessionStorage.getItem(KEY_AUTH) || 'null'); }catch(e){return null;} })();
+  try{
+    // authoritative payload first
+    let auth = null;
+    try{ auth = JSON.parse(sessionStorage.getItem(KEY_AUTH) || 'null'); }catch(e){ auth = null; }
     const combined = Object.assign({}, auth || {}, qp || {});
-    // determine ad props
+    // determine properties
     const ad_id = combined.ad_id || combined.id || ('host_ad_' + Date.now());
-    const secs = Number(combined.secs) || Number(combined.duration) || randInt(AD_DURATIONS);
-    const reward = Number(combined.reward) || Number(combined.r) || (combined.base || 0);
+    const secs = Number(combined.secs || combined.duration) || (combined.secs===0?0: AD_DURATIONS[Math.floor(Math.random()*AD_DURATIONS.length)]);
+    const reward = (combined.reward || combined.r || combined.base) || 0;
     const vip_level = combined.vip || combined.vip_level || (profile && profile.vip_level) || 'none';
     const user = combined.user || (profile && profile) || null;
 
-    // Save last ad payload for debugging/parent handshake
-    try { sessionStorage.setItem('gg_hosted_last_ad_payload', JSON.stringify({ ad_id, secs, reward, vip_level, user })); } catch(e){}
+    // save last ad payload
+    try{ sessionStorage.setItem('gg_hosted_last_ad_payload', JSON.stringify({ ad_id, secs, reward, vip_level, user })); }catch(e){}
 
-    // Render UI
-    setMain(`<div style="display:flex;flex-direction:column;gap:10px">
-      <div class="small">Watching: <strong>${escapeHtml(ad_id)}</strong> · Reward: <strong>${reward} G</strong></div>
-      <div class="ad-player" id="adPlayerNode"><div class="small">Ad player area</div></div>
-      <div style="display:flex;justify-content:center;margin-top:8px"><div class="countdown" id="countdown">${secs}</div></div>
-      <div style="display:flex;justify-content:center;gap:8px;margin-top:10px"><button id="claimBtn" class="btn" disabled>Claim</button><button id="closeBtn" class="btn ghost hidden">Close</button></div>
-    </div>`);
+    // build UI
+    setMain(`<div class="small">Watching: <strong>${escapeHtml(ad_id)}</strong> — Reward: <strong>${reward} G</strong>
+      <div class="small">(${secs}s · VIP: ${escapeHtml(vip_level||'none')})</div></div>
+      <div class="ad-player" id="adPlayerNode"><div class="small">Ad player area (demo)</div></div>
+      <div style="margin-top:12px;display:flex;gap:8px;justify-content:center"><div class="countdown" id="adCount">${secs}</div></div>
+      <div style="margin-top:12px;display:flex;gap:8px;justify-content:center"><button id="claimBtn" class="btn" disabled>Claim</button><button id="retBtn" class="btn ghost hidden">Close</button></div>
+      <div id="adNote" class="note">Auto-completes after ${secs}s</div>`);
 
-    // notify parent hosted is ready (we already announceReady on boot; repeat with ad_id)
+    try{ (adsbygoogle = window.adsbygoogle || []).push({}); }catch(e){}
+
+    // notify parent that hosted is open/ready for this ad
     postParent({ type:'hosted_ready', payload: { ts: Date.now(), ad_id } });
 
-    // start countdown (hosted-controlled)
-    let remaining = secs;
-    const countdownEl = el('countdown'), claimBtn = el('claimBtn'), closeBtn = el('closeBtn');
-    if(countdownEl) countdownEl.textContent = remaining;
-    if(adTimerInterval) clearInterval(adTimerInterval);
-    adTimerInterval = setInterval(()=>{
+    // start countdown and behavior
+    const countEl = el('adCount'), claimBtn = el('claimBtn'), retBtn = el('retBtn'), adNote = el('adNote');
+    let remaining = Number(secs);
+    if(countEl) countEl.textContent = remaining;
+
+    if(adTick) clearInterval(adTick);
+    adTick = setInterval(()=>{
       remaining--;
-      if(countdownEl) countdownEl.textContent = remaining;
+      if(countEl) countEl.textContent = remaining;
       if(remaining <= 0){
-        clearInterval(adTimerInterval);
+        clearInterval(adTick);
         if(claimBtn) claimBtn.disabled = false;
-        // prepare payload
-        const payload = { ad_id, reward, base: reward, vip_bonus: 0, vip_level, user, status:'completed', ts: Date.now() };
-        // post to parent and webhook
-        try { postParent({ type:'ad_complete', payload }); } catch(e){ logd('postParent ad_complete fail'); }
-        // send webhook to bot
-        try { sendWebhook({ action:'ads_validate', payload }); } catch(e){ logd('webhook err'); }
-        // cleanup authoritative payloads
-        try { clearStartPayload(); } catch(e){}
-        if(closeBtn){ closeBtn.classList.remove('hidden'); closeBtn.textContent = 'Close'; }
-        // also request parent to close after short delay
+        adNote.textContent = 'Ad finished. Sending result...';
+
+        const payload = {
+          ad_id,
+          reward,
+          base: reward,
+          vip_bonus: 0,
+          vip_level,
+          user_id: (user && (user.user_id || user.id)) || null,
+          user: user || null,
+          status: 'completed',
+          meta: { ts: Date.now(), source: 'hosted' }
+        };
+
+        // send to parent
+        try{ postParent({ type:'ad_complete', payload }); }catch(e){ console.warn('postParent ad_complete failed'); }
+
+        // If opened directly via deeplink/start param (no parent), send webhook to bot
+        // Determine if opener/parent exists: if no parent or parent === window, treat as deeplink
+        const isStandalone = (window.parent === window);
+        if(isStandalone){
+          try{ sendWebhook({ action:'ads_validate', payload }); }catch(e){ console.warn('webhook send failed', e); }
+        }
+
+        // show close button
+        if(retBtn){ retBtn.classList.remove('hidden'); retBtn.textContent = (isStandalone ? 'Close' : 'Return'); }
+        // request close after short delay
         setTimeout(()=> { postParent({ type:'close_hosted', reason:'ad_done', payload }); }, 900);
       }
     }, 1000);
 
-    // wire claim and close
+    // claim button (manual)
     if(claimBtn) claimBtn.addEventListener('click', ()=>{
+      if(claimBtn.disabled) return;
       claimBtn.disabled = true;
-      const payload = { ad_id, reward, vip_level, user, status:'claimed', ts: Date.now() };
+      const payload = { ad_id, reward, vip_level, user_id: (user && (user.user_id||user.id)) || null, status:'claimed', meta:{ts:Date.now()} };
       postParent({ type:'ad_complete', payload });
-      try { sendWebhook({ action:'ads_validate', payload }); } catch(e){}
-      try { clearStartPayload(); } catch(e){}
-      if(closeBtn) closeBtn.classList.remove('hidden');
+      const isStandalone = (window.parent === window);
+      if(isStandalone) try{ sendWebhook({ action:'ads_validate', payload }); }catch(e){ console.warn('webhook claim failed', e); }
+      try{ sessionStorage.removeItem(KEY_AUTH); sessionStorage.removeItem(KEY_PROFILE); }catch(e){}
+      if(retBtn) retBtn.classList.remove('hidden');
     });
-    if(closeBtn) closeBtn.addEventListener('click', ()=> { postParent({ type:'close_hosted', reason:'user_closed' }); try{ if(window.close) window.close(); }catch(e){} });
 
-  }catch(err){ console.warn('renderAdFlow err', err); setMain('<div class="small">Unable to start ad view.</div>'); }
+    if(retBtn) retBtn.addEventListener('click', ()=> {
+      postParent({ type:'close_hosted', reason:'user_return' });
+      try{ if(window.close) window.close(); }catch(e){}
+    });
+
+  }catch(e){ console.warn('renderAdFlow err', e); setMain('<div class="small">Unable to start ad view.</div>'); }
 }
 
-/* ---------- send webhook to BOT (simple, keepalive) ---------- */
+/* ---------- send webhook to bot (deeplink/direct) ---------- */
 async function sendWebhook(data){
   try{
-    // data: { action, payload }
-    await fetch(BOT_WEBHOOK, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-      keepalive: true
-    });
-    logd('webhook posted', data.action || '');
-  } catch(e){ console.warn('sendWebhook failed', e); }
+    // Accept object with { action, payload } OR raw payload (wrap)
+    const body = (data && data.action) ? data : { action: 'ads_validate', payload: data || {} };
+    // Prefer webhook URL from authoritative payload if present
+    let candidates = [BOT_WEBHOOK];
+    try{
+      const auth = JSON.parse(sessionStorage.getItem(KEY_AUTH) || 'null');
+      if(auth && auth.webhook) candidates.unshift(auth.webhook);
+    }catch(e){}
+    // also check query param ?webhook=
+    try{
+      const qp = (function(){ const s = location.search.replace(/^\?/,''); const o={}; s.split('&').filter(Boolean).forEach(p=>{ const i=p.indexOf('='); if(i<0) o[decodeURIComponent(p)]=''; else o[decodeURIComponent(p.slice(0,i))]=decodeURIComponent(p.slice(i+1)); }); return o; })();
+      if(qp.webhook) candidates.unshift(qp.webhook);
+    }catch(e){}
+    const url = candidates.find(Boolean);
+    if(!url) return console.warn('no webhook available');
+    await fetch(url, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(body), keepalive: true });
+    logd('webhook posted to', url);
+  }catch(e){ console.warn('sendWebhook failed', e); }
 }
 
-/* ---------- router (hash/start param handling) ---------- */
+/* ---------- router (start param / default landing) ---------- */
 function decodeStart(raw){
   if(!raw) return null;
   try{ const norm = raw.replace(/-/g,'+').replace(/_/g,'/'); const json = atob(norm); return JSON.parse(json); }catch(e){ try{ return JSON.parse(decodeURIComponent(raw)); }catch(e){ return null; } }
 }
+
 async function router(){
   try{
-    // check start query param (deeplink-like)
+    // check query param start
     const qp = (function(){ const s = location.search.replace(/^\?/,''); const obj={}; s.split('&').filter(Boolean).forEach(p=>{ const i=p.indexOf('='); if(i<0) obj[decodeURIComponent(p)]=''; else obj[decodeURIComponent(p.slice(0,i))]=decodeURIComponent(p.slice(i+1)); }); return obj; })();
     if(qp.start){
       const decoded = decodeStart(qp.start);
       if(decoded){ processStartPayload(decoded); return; }
     }
-    // check for explicit hash ad/task handled earlier in parseHashPayloadOnBoot
-    // default: show public landing if no authoritative payload
+    // if AUTHORITATIVE payload exists in sessionStorage -> automatically render ad/task if present
     const auth = (function(){ try{ return JSON.parse(sessionStorage.getItem(KEY_AUTH)||'null'); }catch(e){return null;} })();
-    if(auth) { if(auth.ad_id) renderAdFlow(auth); else if(auth.tasks) { PARENT_TASKS = auth.tasks; renderTasksFromParent(PARENT_TASKS); } else showPublicLanding(); }
-    else showPublicLanding();
+    if(auth){
+      if(auth.ad_id) { renderAdFlow(auth); return; }
+      if(auth.tasks) { PARENT_TASKS = auth.tasks; renderTasksFromParent(PARENT_TASKS); return; }
+    }
+    // default: public landing
+    showPublicLanding();
   }catch(e){ console.warn('router err', e); showPublicLanding(); }
 }
 
@@ -528,9 +513,10 @@ async function router(){
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', router);
 else router();
 
-/* ---------- expose debug helpers to console ---------- */
-window.__hosted_clear = clearStartPayload;
+/* ---------- expose helpers ---------- */
+window.__hosted_clear = function(){ try{ sessionStorage.removeItem(KEY_AUTH); sessionStorage.removeItem(KEY_PROFILE); }catch(e){}; profile=null; setMain('<div class="small">Cleared.</div>'); };
 window.__hosted_process = processStartPayload;
+
 </script>
 </body>
 </html>
