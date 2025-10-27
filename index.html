@@ -208,6 +208,119 @@ function getHashQP(){ if(!location.hash) return {}; const h = location.hash.repl
 function getSearchQP(){ return qsParse(location.search || ''); }
 function combinedQP(){ return Object.assign({}, getHashQP(), getSearchQP()); }
 
+/* ===== PATCH: decode hash/base64 payload + processStartPayload =====
+   - Decodes base64 payload placed in iframe hash (or URL-safe / encoded JSON).
+   - Stores authoritative payload in sessionStorage (key used elsewhere: gg_hosted_authoritative_payload)
+   - Updates `profile` and VIP label so UI shows user info
+   - When payload contains ad/task it triggers the appropriate flow (renderAdFlow / awaitRunTaskFlowFromPayload)
+   - Safe: does not override existing sessionStorage when payload missing; idempotent.
+*/
+
+function tryDecodePayloadString(raw){
+  // Try base64 then URL-decode JSON, return object or null
+  if(!raw) return null;
+  try {
+    // If it looks like URL-encoded JSON (starts with %7B or %5B) try decodeURIComponent first
+    if(raw.startsWith('%7B') || raw.startsWith('%5B') || raw.indexOf('%22') !== -1){
+      try { return JSON.parse(decodeURIComponent(raw)); } catch(e){}
+    }
+    // Normalize URL-safe base64
+    let norm = raw.replace(/\s+/g,'').replace(/-/g,'+').replace(/_/g,'/');
+    // pad if needed
+    const pad = norm.length % 4;
+    if(pad === 2) norm += '=='; else if(pad === 3) norm += '=';
+    try {
+      const decoded = atob(norm);
+      try { return JSON.parse(decoded); } catch(e){}
+      // not JSON, return raw string
+      return decoded;
+    } catch(e){
+      // fallback: maybe it's plain JSON string (not base64)
+      try { return JSON.parse(raw); } catch(e){ return null; }
+    }
+  } catch(err){
+    console.warn('tryDecodePayloadString err', err);
+    return null;
+  }
+}
+
+function processStartPayload(payload){
+  try {
+    if(!payload || typeof payload !== 'object') return;
+    // Normalize some common keys
+    const p = Object.assign({}, payload);
+
+    // Save authoritative copy (used by renderAdFlow)
+    try { sessionStorage.setItem('gg_hosted_authoritative_payload', JSON.stringify(p)); } catch(e){}
+
+    // If payload includes user object / profile, apply it so UI shows VIP and can be used in rewards
+    try {
+      if(p.user && typeof p.user === 'object'){
+        profile = Object.assign({}, profile || {}, p.user);
+        try { sessionStorage.setItem('gg_hosted_profile', JSON.stringify(profile)); } catch(e){}
+        setVIPLabel();
+      } else if(p.profile && typeof p.profile === 'object'){
+        profile = Object.assign({}, profile || {}, p.profile);
+        try { sessionStorage.setItem('gg_hosted_profile', JSON.stringify(profile)); } catch(e){}
+        setVIPLabel();
+      } else if(p.vip_level && (!profile || !profile.vip_level)){
+        // minimal VIP assign
+        profile = profile || {};
+        profile.vip_level = p.vip_level;
+        setVIPLabel();
+      }
+    } catch(e){ console.warn('processStartPayload profile apply err', e); }
+
+    // Push tasks if provided
+    if(Array.isArray(p.tasks) && p.tasks.length){
+      const mapped = p.tasks.map(t => ({
+        id: t.id || t.task_id || ('task_' + Math.random().toString(36).slice(2,8)),
+        title: t.title || t.name || ('Task ' + (t.id||'')),
+        secs: t.secs || t.duration || 30,
+        reward: t.reward || t.base || 0,
+        url: t.url || t.link || '',
+        tag: t.tag || t.type || ''
+      }));
+      PARENT_TASKS = mapped;
+      renderTasksFromParent(PARENT_TASKS);
+      return;
+    }
+
+    // If payload looks like an ad open request, route to ad view
+    if(p.ad_id || p.id || p.isAd || p.type === 'ad'){
+      // renderAdFlow accepts qp-like object
+      try { renderAdFlow({ ad_id: p.ad_id || p.id, secs: p.secs || p.duration || p.s, reward: p.reward || p.r || p.base, vip: p.vip || p.vip_level, _source: 'ui' }); } catch(e){ console.warn('renderAdFlow error', e); }
+      return;
+    }
+
+    // If payload looks like a task open request, route to task flow
+    if(p.task_id || p.type === 'task' || p.isTask){
+      try { awaitRunTaskFlowFromPayload(p); } catch(e){ console.warn('awaitRunTaskFlowFromPayload err', e); }
+      return;
+    }
+
+    // If payload doesn't match ad/task, keep it stored for later (UI can inspect)
+  } catch(err){ console.warn('processStartPayload err', err); }
+}
+
+/* check location.hash for a direct base64 payload (our gain.web uses '#<base64>') */
+(function parseHashPayloadOnBoot(){
+  try {
+    const h = location.hash || '';
+    if(!h) return;
+    // remove leading '#'
+    const raw = h.replace(/^#/,'');
+    // if hash contains '=' or '&' or starts with '?', getQuery style - skip here
+    if(raw.indexOf('=') !== -1 || raw.indexOf('&') !== -1 || raw.indexOf('?') === 0) return;
+    // try decode
+    const decoded = tryDecodePayloadString(decodeURIComponent(raw));
+    if(decoded && (typeof decoded === 'object')){
+      // If decoded looks like our structured payload, process it now
+      processStartPayload(decoded);
+    }
+  } catch(e){ console.warn('parseHashPayloadOnBoot err', e); }
+})();
+
 /* ===== VIP & profile helpers (kept) ===== */
 let profile = null;
 function readLocalProfile(){
@@ -272,15 +385,22 @@ function tryLoadVideoSrc(videoUrl, timeoutMs=3000){
       document.body.appendChild(dbg);
     }
 
-    function announceReady(){
-      try{
-        window.__HOSTED_IS_READY = true;
-        _consumeQueuedMessages();
-        postParent({ type: 'hosted_ready', payload: { ts: Date.now() } });
-        const d = document.getElementById('hostedDbg');
-        if(d) d.textContent = 'hosted:ready';
-      }catch(e){ console.warn('announceReady failed', e); }
-    }
+
+/* ===== PATCH: send ad_id (if known) with hosted_ready so parent can handshake precisely ===== */
+function announceReady(){
+  try{
+    window.__HOSTED_IS_READY = true;
+    _consumeQueuedMessages();
+    // include ad_id if we have last authoritative payload
+    let auth = null;
+    try { auth = JSON.parse(sessionStorage.getItem('gg_hosted_authoritative_payload') || 'null'); } catch(e){ auth = null; }
+    const payload = { ts: Date.now() };
+    if(auth && (auth.ad_id || auth.id)) payload.ad_id = (auth.ad_id || auth.id);
+    postParent({ type: 'hosted_ready', payload: payload });
+    const d = document.getElementById('hostedDbg');
+    if(d) d.textContent = 'hosted:ready' + (payload.ad_id ? ' ad:' + payload.ad_id : '');
+  }catch(e){ console.warn('announceReady failed', e); }
+}
 
     if(document.readyState === 'complete' || document.readyState === 'interactive'){
       setTimeout(announceReady, 80);
