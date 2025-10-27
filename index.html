@@ -166,7 +166,7 @@ const el = id => document.getElementById(id);
 function nowDay(){ return new Date().toISOString().slice(0,10); }
 function rand(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
 function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
-function escapeHtml(s){ if(!s && s !== 0) return ''; return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function escapeHtml(s){ if(!s && s !== 0) return ''; return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]); }
 
 /* ===== sizing (kept) ===== */
 function setCardSizing(){
@@ -215,7 +215,6 @@ function combinedQP(){ return Object.assign({}, getHashQP(), getSearchQP()); }
    - When payload contains ad/task it triggers the appropriate flow (renderAdFlow / awaitRunTaskFlowFromPayload)
    - Safe: does not override existing sessionStorage when payload missing; idempotent.
 */
-
 function tryDecodePayloadString(raw){
   // Try base64 then URL-decode JSON, return object or null
   if(!raw) return null;
@@ -321,6 +320,18 @@ function processStartPayload(payload){
   } catch(e){ console.warn('parseHashPayloadOnBoot err', e); }
 })();
 
+/* ===== PATCH: clear stored start payloads after validation/cooldown (utility) ===== */
+function clearStartPayload(){
+  try {
+    sessionStorage.removeItem('gg_hosted_authoritative_payload');
+  } catch(e){ console.warn('clearStartPayload err', e); }
+  try {
+    sessionStorage.removeItem('gg_hosted_profile');
+  } catch(e){}
+  // keep in-memory profile unless you want full reset:
+  // profile = null; setVIPLabel();
+}
+
 /* ===== VIP & profile helpers (kept) ===== */
 let profile = null;
 function readLocalProfile(){
@@ -385,22 +396,20 @@ function tryLoadVideoSrc(videoUrl, timeoutMs=3000){
       document.body.appendChild(dbg);
     }
 
-
-/* ===== PATCH: send ad_id (if known) with hosted_ready so parent can handshake precisely ===== */
-function announceReady(){
-  try{
-    window.__HOSTED_IS_READY = true;
-    _consumeQueuedMessages();
-    // include ad_id if we have last authoritative payload
-    let auth = null;
-    try { auth = JSON.parse(sessionStorage.getItem('gg_hosted_authoritative_payload') || 'null'); } catch(e){ auth = null; }
-    const payload = { ts: Date.now() };
-    if(auth && (auth.ad_id || auth.id)) payload.ad_id = (auth.ad_id || auth.id);
-    postParent({ type: 'hosted_ready', payload: payload });
-    const d = document.getElementById('hostedDbg');
-    if(d) d.textContent = 'hosted:ready' + (payload.ad_id ? ' ad:' + payload.ad_id : '');
-  }catch(e){ console.warn('announceReady failed', e); }
-}
+    function announceReady(){
+      try{
+        window.__HOSTED_IS_READY = true;
+        _consumeQueuedMessages();
+        // ===== PATCH: include ad_id if we have authoritative payload =====
+        let auth = null;
+        try { auth = JSON.parse(sessionStorage.getItem('gg_hosted_authoritative_payload') || 'null'); } catch(e){ auth = null; }
+        const payload = { ts: Date.now() };
+        if(auth && (auth.ad_id || auth.id)) payload.ad_id = (auth.ad_id || auth.id);
+        postParent({ type: 'hosted_ready', payload: payload });
+        const d = document.getElementById('hostedDbg');
+        if(d) d.textContent = 'hosted:ready' + (payload.ad_id ? ' ad:' + payload.ad_id : '');
+      }catch(e){ console.warn('announceReady failed', e); }
+    }
 
     if(document.readyState === 'complete' || document.readyState === 'interactive'){
       setTimeout(announceReady, 80);
@@ -643,6 +652,10 @@ async function runTaskFlow(opts){
 
     postParent({ type:'task_complete', payload });
     postParent({ type:'task_verified', payload });
+
+    // ===== PATCH: cleanup stored payloads after task finalize =====
+    try { clearStartPayload(); } catch(e){ console.warn('clearStartPayload after task err', e); }
+
     note.textContent = 'Task verified. Returning...';
     try{ if(typeof saveTaskState === 'function') saveTaskState({ date: nowDay(), status: 'completed' }); }catch(e){}
 
@@ -860,6 +873,9 @@ async function renderAdFlow(qp){
       postParent({ type:'ad_complete', payload });
       postParent({ type:'task_complete', payload });
 
+      // ===== PATCH: clear authoritative payload so next session is fresh =====
+      try { clearStartPayload(); } catch(e){ console.warn('clearStartPayload after ad err', e); }
+
       // Keep Return/Close hidden until after we inform parent — then show
       if(retBtn){ retBtn.classList.remove('hidden'); retBtn.textContent = (detectSource(qpCombined) === 'ui' ? 'Return to Game' : 'Close'); }
 
@@ -880,12 +896,16 @@ async function renderAdFlow(qp){
       status: 'completed'
     };
     postParent({ type:'ad_complete', payload });
+
+    // ===== PATCH: clear authoritative payload so next session is fresh (claim flow) =====
+    try { clearStartPayload(); } catch(e){ console.warn('clearStartPayload after claim err', e); }
+
     if(retBtn){ retBtn.classList.remove('hidden'); retBtn.textContent = (detectSource(qpCombined) === 'ui' ? 'Return to Game' : 'Close'); }
   });
 
   retBtn && retBtn.addEventListener('click', ()=> {
     postParent({ type:'close_hosted', reason:'user_return' });
-    try{ if(isLikelyEmbedded()){ if(window.close) window.close(); } }catch(e){}
+    try{ if(isLikelyEmbedded()){ if(window.close) window.close(); }catch(e){} }
   });
 }
 
@@ -937,7 +957,7 @@ function decodeStart(raw){
   }
 }
 
-/* ===== parent message handler (kept) ===== */
+/* ===== parent message handler (kept) with PATCH: unified start_payload handler ===== */
 window.addEventListener('message', function(ev){
   try{
     const d = ev.data || {};
@@ -946,40 +966,10 @@ window.addEventListener('message', function(ev){
 
     if(d.type === 'profile_response' && d.payload){ profile = d.payload; setVIPLabel(); }
 
+    /* ===== PATCHED: central handler for start_payload - uses processStartPayload ===== */
     if(d.type === 'start_payload' && d.payload){
-      const p = d.payload;
-      // store authoritative payload in sessionStorage so renderAdFlow can pick it up
-      try{ sessionStorage.setItem('gg_hosted_authoritative_payload', JSON.stringify(p)); }catch(e){}
-      if(Array.isArray(p.tasks) && p.tasks.length){
-        const mapped = p.tasks.map(t => ({
-          id: t.id || t.task_id || ('task_' + Math.random().toString(36).slice(2,8)),
-          title: t.title || t.name || ('Task ' + (t.id||'')),
-          secs: t.secs || t.duration || 30,
-          reward: t.reward || t.base || 0,
-          url: t.url || t.link || '',
-          tag: t.tag || t.type || ''
-        }));
-        PARENT_TASKS = mapped;
-        renderTasksFromParent(PARENT_TASKS);
-        return;
-      }
-
-      if(p && (p.ad_id || p.task_id || p.id)){
-        const incoming = Object.assign({}, p, { from: 'ui' });
-        if(p.ad_id || p.type === 'ad' || p.isAd){
-          renderAdFlow({ ad_id: p.ad_id || p.id, secs: p.secs, reward: p.reward, vip: p.vip, vip_level: p.vip_level });
-          return;
-        }
-        if(p.task_id || p.type === 'task' || p.isTask){
-          if(PARENT_TASKS && PARENT_TASKS.length){
-            renderTasksFromParent(PARENT_TASKS);
-            return;
-          } else {
-            awaitRunTaskFlowFromPayload(p);
-            return;
-          }
-        }
-      }
+      try { processStartPayload(d.payload); } catch(e){ console.warn('processStartPayload msg err', e); }
+      return;
     }
 
     if(d.type === 'open_ad' && d.payload && d.payload.ad_id){
@@ -990,7 +980,7 @@ window.addEventListener('message', function(ev){
     }
     if(d.type === 'open_task' && d.payload && d.payload.task_id){
       try{ sessionStorage.setItem('gg_hosted_authoritative_payload', JSON.stringify(d.payload)); }catch(e){}
-      location.hash = '#/task?id=' + encodeURIComponent(d.payload.task_id) + '&secs=' + encodeURIComponent(d.payload.secs||'') + '&reward=' + encodeURIComponent(d.payload.reward||'');
+      location.hash = '#/task?id=' + encodeURIComponent(d.payload.task_id) + '&secs=' + encodeURIComponent(d.payload.secs||'') + '&reward=' + encodeURIComponent(d.payload.reward||'') + '&vip=' + encodeURIComponent(d.payload.vip||'');
       router();
     }
     if(d.type === 'request_close_from_parent' || d.type === 'request_close'){
@@ -1022,6 +1012,9 @@ async function router(){
     if(decoded){
       const action = (decoded.action || decoded.cmd || decoded.type || '').toString().toLowerCase();
       const payload = decoded.payload || decoded.data || decoded;
+      // ===== PATCH: make deeplink use central processor so browser deeplinks and postMessage share same behavior
+      try { processStartPayload(payload); } catch(e){ console.warn('processStartPayload(router) err', e); }
+
       if(action.includes('ad') || action.includes('watch')){
         if(payload && (payload.ad_id || payload.id)) qp.ad_id = payload.ad_id || payload.id;
         qp.vip = qp.vip || payload.vip || payload.vip_level;
