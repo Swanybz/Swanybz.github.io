@@ -3,133 +3,318 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
-<title>GainGrid Hosted — Tasks & Ads</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+<title>GainGrid Hosted — Ads (deeplink-only)</title>
+
+<!-- AdSense core (kept) -->
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2309008538670900"
+     crossorigin="anonymous"></script>
+
+<!-- Verification metadata placeholders (replace with your provided token/meta/file if required by Ad providers) -->
+<!--
+  Verification options (choose and deploy externally as required):
+  1) Upload file to site root: swanybz.github.io/15f05b82a9694a8c92a9.txt
+  2) Add meta tag to homepage:
+     <meta name="site-verification" content="15f05b82a9694a8c92a9">
+  3) Add DNS TXT: 15f05b82a9694a8c92a9e17869e04d037a0a8a2f
+  Set the constants below to match whichever you publish.
+-->
+<meta name="site-verification" content="15f05b82a9694a8c92a9">
+
 <style>
-:root{
-  --grad1:#ff6b9d;--grad2:#c471ed;
-  --bg:linear-gradient(135deg,#0f1419 0,#1a2332 50%,#0d1117 100%);
-}
-*{box-sizing:border-box}
-html,body{margin:0;padding:0;height:100%;background:var(--bg);color:#fff;font-family:Inter,system-ui}
-.main{display:flex;align-items:center;justify-content:center;height:100vh;padding:16px}
-.card{width:420px;max-width:100%;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.05);border-radius:16px;padding:16px;box-shadow:0 10px 25px rgba(0,0,0,0.5);display:flex;flex-direction:column}
-.head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-button{cursor:pointer}
-.btn{background:linear-gradient(45deg,var(--grad1),var(--grad2));border:none;color:#fff;padding:8px 12px;border-radius:8px;font-weight:700}
-.btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.1)}
-.info{font-size:12px;color:rgba(255,255,255,0.7);margin-top:4px}
-.player{flex:1;background:#000;display:flex;align-items:center;justify-content:center;border-radius:8px;overflow:hidden;margin-top:8px;position:relative}
-.player video,.player iframe{width:100%;height:100%;border:0;object-fit:cover}
-.bottom{margin-top:10px;display:flex;justify-content:center;gap:8px;align-items:center}
-.countdown{font-size:18px;font-weight:700}
-.note{font-size:12px;color:rgba(255,255,255,0.6);text-align:center;margin-top:8px}
+  html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial;color:#111;background:#0d1117;display:flex;align-items:center;justify-content:center}
+  .container{width:100%;max-width:720px;padding:18px;background:linear-gradient(180deg,#0f1419,#111827);border-radius:10px;color:#fff;box-shadow:0 10px 30px rgba(0,0,0,0.6)}
+  h1{font-size:18px;margin:0 0 10px 0;font-weight:600}
+  .small{font-size:13px;color:rgba(255,255,255,0.78);margin-bottom:10px}
+  .ad-player{width:100%;height:320px;background:#000;border-radius:8px;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  .note{margin-top:10px;font-size:13px;color:rgba(255,255,255,0.7)}
+  .controls{margin-top:12px;display:flex;gap:8px;align-items:center}
+  .btn{padding:8px 10px;border-radius:8px;border:0;background:#2b6cff;color:#fff;cursor:pointer;font-weight:700}
+  .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06)}
+  .countdown{font-weight:700;font-size:18px}
+  #dbg{margin-top:10px;font-size:12px;color:rgba(255,255,255,0.5);display:none}
 </style>
 </head>
 <body>
-<div class="main">
- <div class="card">
-   <div class="head">
-     <div><b id="taskType">Initializing…</b></div>
-     <button class="btn ghost" id="closeBtn">×</button>
-   </div>
+  <div class="container" role="main" aria-live="polite">
+    <h1>GainGrid — Hosted Ad Player (Deeplink)</h1>
+    <div class="small">This view runs only for deeplink/hash payloads. It will run a countdown (secs) then POST result to your webhook.</div>
 
-   <div class="player" id="adPlayer"><div id="loadingTxt">Waiting for Gain.web…</div></div>
+    <div class="ad-player" id="adPlayer">
+      <div class="small" id="adPlaceholder">Ad player area</div>
+    </div>
 
-   <div class="bottom">
-     <div class="countdown" id="timer">--</div>
-     <button class="btn" id="claimBtn" disabled>Claim</button>
-   </div>
+    <div class="controls">
+      <div class="countdown" id="countdown">—</div>
+      <button id="claimBtn" class="btn" disabled>Send Result Now</button>
+    </div>
 
-   <div class="note" id="noteTxt">Preparing environment…</div>
- </div>
-</div>
+    <div class="note" id="note">Waiting for deeplink payload...</div>
+    <div id="dbg">dbg</div>
+  </div>
 
 <script>
-/* GainGrid Hosted — Original handshake repaired */
-const PLAYER= document.getElementById('adPlayer');
-const NOTE= document.getElementById('noteTxt');
-const TIMER= document.getElementById('timer');
-const CLAIM= document.getElementById('claimBtn');
-const TYPE= document.getElementById('taskType');
-let countdown=null, left=0, active=null;
+/* =========================
+  Simplified hosted page (deeplink/hash only)
+  - No parent handshake
+  - Accepts payload via:
+      - URL query: ?start=<base64>
+      - Hash: #<base64>  OR #/ad?ad_id=...
+      - direct JSON in query/hash (URL-encoded)
+  - Runs countdown for 'secs' (or random 30/40/50/60)
+  - POSTs result to BOT_WEBHOOK (onWebhook)
+  - Tries AdSense, then Adsterra, then fallback video
+  ========================= */
 
-/* === announce ready to Gain.web === */
-function announceReady(){
-  post({type:'_GG_HOSTED_READY', time:Date.now()});
-  NOTE.textContent='Ready for connection…';
-}
+/* ====== CONFIG (set these) ====== */
+// Your bot onWebhook endpoint (where hosted will POST validation results)
+const BOT_WEBHOOK = "https://gaingrid.bots.business/onWebhook";
 
-/* === handle incoming payload === */
-function handlePayload(data){
-  if(!data)return;
+// Ad injection keys (Adsterra key used in dynamic injection)
+const ADSTER_SCRIPT_KEY = 'a8702b8b4c48420a3815542007f1c0df';
+const ADSTER_SCRIPT_SRC = "//www.highperformanceformat.com/" + ADSTER_SCRIPT_KEY + "/invoke.js";
+
+// Verification details (provided in your note) - keep as constants for your records
+const VERIF_FILENAME = '15f05b82a9694a8c92a9.txt';
+const VERIF_META = '15f05b82a9694a8c92a9';
+const VERIF_DNS = '15f05b82a9694a8c92a9e17869e04d037a0a8a2f';
+
+/* ====== small utilities ====== */
+const el = id => document.getElementById(id);
+function dbg(msg){ try{ el('dbg').style.display='block'; el('dbg').textContent = msg; console.log('hosted:', msg);}catch(e){} }
+function nowTs(){ return (new Date()).toISOString(); }
+function safeJSONParse(s){ try{ return JSON.parse(s);}catch(e){ return null; } }
+
+/* ====== decode helpers (base64 safe) ====== */
+function decodeBase64UrlSafe(raw){
+  if(!raw) return null;
   try{
-    const {id,secs,reward,type,vip_level,user_id,from}=data;
-    active={id,secs,reward,type,vip_level,user_id};
-    sessionStorage.setItem('GG_ACTIVE_PAYLOAD',JSON.stringify(active));
-    TYPE.textContent= type==='task' ? 'Task Board' : 'Ad Session';
-    NOTE.textContent='Connected ✓';
-    startPlay();
+    let r = raw.replace(/\s+/g,'').replace(/-/g,'+').replace(/_/g,'/');
+    const pad = r.length % 4;
+    if(pad === 2) r += '=='; else if(pad === 3) r += '=';
+    const dec = atob(r);
+    try{ return JSON.parse(dec); }catch(e){ return dec; }
   }catch(e){
-    NOTE.textContent='Error parsing payload';
+    return null;
   }
 }
-
-/* === start playback or display === */
-function startPlay(){
-  PLAYER.innerHTML='';
-  const vid=document.createElement('video');
-  vid.src='https://storage.googleapis.com/interactive-media-ads/media/big_buck_bunny_trailer.mp4';
-  vid.autoplay=true;vid.muted=true;vid.playsInline=true;
-  PLAYER.appendChild(vid);
-  left=active.secs||30;
-  TIMER.textContent=left;
-  if(countdown)clearInterval(countdown);
-  countdown=setInterval(()=>{
-    left--;TIMER.textContent=left;
-    if(left<=0){clearInterval(countdown);finish();}
-  },1000);
-  NOTE.textContent='Playing '+active.id+' ('+left+'s)';
-}
-
-/* === finish and report back === */
-function finish(){
-  TIMER.textContent='✔';
-  NOTE.textContent='Completed successfully';
-  CLAIM.disabled=false;
-  CLAIM.onclick=()=>{
-    post({type:'_GG_HOSTED_DONE', payload:active});
-    CLAIM.disabled=true;
-    NOTE.textContent='Reported back ✓';
-    sessionStorage.removeItem('GG_ACTIVE_PAYLOAD');
-    setTimeout(()=>announceReady(),1200);
-  };
-}
-
-/* === bridge post === */
-function post(obj){
+function tryDecodePayloadString(raw){
+  if(!raw) return null;
   try{
-    if(window.parent && window.parent!==window) window.parent.postMessage(obj,'*');
-    if(window.opener && !window.opener.closed) window.opener.postMessage(obj,'*');
-  }catch(e){console.warn(e);}
+    // URL-encoded JSON
+    if((raw.indexOf('%7B') === 0) || (raw.indexOf('%5B') === 0) || raw.indexOf('%22') !== -1){
+      try{ return JSON.parse(decodeURIComponent(raw)); }catch(e){}
+    }
+    // raw JSON
+    if((raw[0] === '{') || (raw[0] === '[')) {
+      try{ return JSON.parse(raw); }catch(e){}
+    }
+    // try base64 (URLsafe)
+    const maybe = decodeBase64UrlSafe(raw);
+    if(maybe) return maybe;
+    // try decodeURIComponent fallback
+    try{ return JSON.parse(decodeURIComponent(raw)); }catch(e){}
+  }catch(e){}
+  return null;
 }
 
-/* === listen from gain.web === */
-window.addEventListener('message',e=>{
-  const d=e.data||{};
-  if(d.type==='_GG_START_PAYLOAD'){handlePayload(d.payload);}
-  if(d.type==='_GG_PING'){post({type:'_GG_PONG',time:Date.now()});}
-});
+/* ====== ad provider injection (AdSense preferred, else Adsterra, else fallback video) ====== */
+async function tryInjectAdsense(holder){
+  try{
+    // Show a visible ins tag for reviewer & AdSense
+    const ins = document.createElement('ins');
+    ins.className = 'adsbygoogle';
+    ins.style.display = 'inline-block';
+    ins.style.width = '100%';
+    ins.style.height = '100%';
+    ins.setAttribute('data-ad-client','ca-pub-2309008538670900');
+    ins.setAttribute('data-ad-slot','4194843603');
+    holder.innerHTML = '';
+    holder.appendChild(ins);
+    try{ (adsbygoogle = window.adsbygoogle || []).push({}); }catch(e){ /* ignore */ }
+    return true;
+  }catch(e){ return false; }
+}
+function injectAdsterraIntoElement(holder){
+  try{
+    holder.innerHTML = '';
+    const wrap = document.createElement('div');
+    wrap.style.width = '100%'; wrap.style.height = '100%'; wrap.style.display='flex'; wrap.style.alignItems='center'; wrap.style.justifyContent='center';
+    holder.appendChild(wrap);
+    // create script tags
+    const s1 = document.createElement('script'); s1.type='text/javascript';
+    s1.text = "atOptions = { 'key' : '" + ADSTER_SCRIPT_KEY + "', 'format' : 'iframe', 'height' : 60, 'width' : 468, 'params' : {} };";
+    const s2 = document.createElement('script'); s2.type='text/javascript'; s2.src = ADSTER_SCRIPT_SRC;
+    wrap.appendChild(s1); wrap.appendChild(s2);
+    return true;
+  }catch(e){ return false; }
+}
 
-/* === restore if payload exists === */
-window.addEventListener('load',()=>{
-  announceReady();
-  const st=sessionStorage.getItem('GG_ACTIVE_PAYLOAD');
-  if(st){try{handlePayload(JSON.parse(st));}catch{}}
-});
+/* fallback video */
+function showFallbackVideo(holder){
+  try{
+    holder.innerHTML = '';
+    const v = document.createElement('video');
+    v.src = "https://storage.googleapis.com/interactive-media-ads/media/big_buck_bunny_trailer.mp4";
+    v.autoplay = true; v.muted = true; v.playsInline = true; v.controls = false;
+    v.style.width='100%'; v.style.height='100%';
+    holder.appendChild(v);
+    try{ v.play().catch(()=>{}); }catch(e){}
+    return true;
+  }catch(e){ return false; }
+}
 
-/* === close === */
-document.getElementById('closeBtn').onclick=()=>{post({type:'_GG_CLOSE'});window.close&&window.close();};
+/* ====== core: run countdown and then POST to BOT_WEBHOOK ====== */
+let countdownInterval = null;
+function startCountdownAndReport(payload){
+  try{
+    if(!payload || typeof payload !== 'object'){ el('note').textContent = 'Invalid payload'; dbg('invalid payload'); return; }
+    // store for debugging
+    try{ sessionStorage.setItem('gg_hosted_authoritative_payload', JSON.stringify(payload)); }catch(e){}
+    // determine secs
+    const durations = [30,40,50,60];
+    const secs = Number(payload.secs) || durations[Math.floor(Math.random()*durations.length)];
+    const adId = payload.ad_id || payload.id || ('host_ad_' + Date.now());
+    const reward = payload.reward || payload.r || payload.base || 0;
+    // render ad provider - try AdSense -> Adsterra -> fallback
+    const holder = el('adPlayer');
+    (async ()=>{
+      let ok = await tryInjectAdsense(holder);
+      if(!ok){
+        ok = injectAdsterraIntoElement(holder);
+        if(!ok) showFallbackVideo(holder);
+      }
+    })();
+
+    el('note').textContent = `Running countdown for ${secs}s — ad_id: ${adId}`;
+    el('countdown').textContent = secs;
+    el('claimBtn').disabled = true;
+
+    // run countdown
+    let remaining = secs;
+    if(countdownInterval) clearInterval(countdownInterval);
+    countdownInterval = setInterval(()=>{
+      remaining--;
+      el('countdown').textContent = remaining;
+      if(remaining <= 0){
+        clearInterval(countdownInterval);
+        el('claimBtn').disabled = false;
+        el('note').textContent = 'Countdown finished — result ready to send.';
+        // build result payload
+        const result = {
+          ad_id: adId,
+          reward: reward,
+          base: payload.base || 0,
+          vip_level: payload.vip_level || payload.vip || null,
+          user: payload.user || payload.user_id || null,
+          status: 'completed',
+          ts: nowTs(),
+          original_payload: payload
+        };
+        // auto-send to webhook (keepalive)
+        sendToOnWebhook(result);
+      }
+    }, 1000);
+
+    // manual claim button also available after countdown
+    el('claimBtn').onclick = function(){
+      // build best-effort payload (same as above)
+      const result = {
+        ad_id: adId,
+        reward: reward,
+        base: payload.base || 0,
+        vip_level: payload.vip_level || payload.vip || null,
+        user: payload.user || payload.user_id || null,
+        status: 'claimed_manual',
+        ts: nowTs(),
+        original_payload: payload
+      };
+      sendToOnWebhook(result);
+      el('claimBtn').disabled = true;
+    };
+
+  }catch(e){ console.warn('startCountdownAndReport err', e); dbg('start err'); }
+}
+
+/* ====== send to bot onWebhook (keepalive) ====== */
+function sendToOnWebhook(data){
+  try{
+    // prepare the payload wrapper similar to your bot pattern
+    const wrapper = { action: 'ads_validate', payload: data, meta: { ts: Date.now(), host: location.href } };
+    // use navigator.sendBeacon if available for reliability on unload, else fetch keepalive
+    const bodyStr = JSON.stringify(wrapper);
+    let sent = false;
+    try{
+      if(navigator.sendBeacon){
+        const blob = new Blob([bodyStr], { type: 'application/json' });
+        sent = navigator.sendBeacon(BOT_WEBHOOK, blob);
+      }
+    }catch(e){ sent = false; }
+    if(!sent){
+      // try fetch with keepalive
+      fetch(BOT_WEBHOOK, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: bodyStr, keepalive:true })
+        .then(r=> { /* don't block */ })
+        .catch(()=>{ /* ignore */ });
+    }
+    dbg('posted to webhook');
+    el('note').textContent = 'Result posted to webhook.';
+  }catch(e){ console.warn('sendToOnWebhook err', e); dbg('webhook err'); el('note').textContent = 'Failed to post result (check BOT_WEBHOOK)'; }
+}
+
+/* ====== startup: decode start payload from ?start= or hash and run ====== */
+(function bootDecodeAndRun(){
+  try{
+    // 1) Query param ?start= (base64 payload)
+    const qs = (function(){ const s = location.search.replace(/^\?/,''); if(!s) return {}; return s.split('&').filter(Boolean).map(p=>{ const i=p.indexOf('='); if(i<0) return [decodeURIComponent(p),'']; return [decodeURIComponent(p.slice(0,i)), decodeURIComponent(p.slice(i+1))]; }).reduce((o,[k,v])=>{ o[k]=v; return o; }, {}); })();
+    if(qs.start){
+      const decoded = tryDecodePayloadString(qs.start);
+      if(decoded && typeof decoded === 'object'){
+        el('note').textContent = 'Received start payload (query).';
+        startCountdownAndReport(decoded);
+        return;
+      }
+    }
+
+    // 2) Hash base64 or path-like (#<base64> or #/ad?ad_id=...)
+    const hRaw = (location.hash||'').replace(/^#/,'');
+    if(hRaw){
+      // if path-like: #/ad?ad_id=...
+      if(hRaw.startsWith('/')){
+        const parts = hRaw.split('?'); const path = parts[0].replace(/^\//,'');
+        const qp = {};
+        if(parts[1]){
+          parts[1].split('&').forEach(p=>{
+            const i=p.indexOf('=');
+            if(i>=0) qp[decodeURIComponent(p.slice(0,i))]=decodeURIComponent(p.slice(i+1));
+            else qp[decodeURIComponent(p)] = '';
+          });
+        }
+        if(path === 'ad' && (qp.ad_id || qp.id)){
+          const payload = { ad_id: qp.ad_id || qp.id, secs: qp.secs || qp.duration, reward: qp.reward || qp.base, user: { user_id: qp.user_id || qp.uid || null } };
+          el('note').textContent = 'Received start payload (hash path).';
+          startCountdownAndReport(payload);
+          return;
+        }
+      } else {
+        const decoded = tryDecodePayloadString(decodeURIComponent(hRaw));
+        if(decoded && typeof decoded === 'object'){
+          el('note').textContent = 'Received start payload (hash).';
+          startCountdownAndReport(decoded);
+          return;
+        }
+      }
+    }
+
+    // nothing found -> show minimal public state
+    el('note').textContent = 'No deeplink/hash payload found. This hosted page runs only for deeplink/hash calls.';
+    el('countdown').textContent = '—';
+    // show AdSense slot for reviewers even if no payload
+    const holder = el('adPlayer');
+    tryInjectAdsense(holder).then(ok=>{
+      if(!ok) { injectAdsterraIntoElement(holder) || showFallbackVideo(holder); }
+    });
+  }catch(e){ console.warn('bootDecodeAndRun err', e); dbg('boot err'); }
+})();
+
 </script>
 </body>
 </html>
