@@ -6,460 +6,155 @@
 <title>GainGrid Hosted — Ad Player</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 
-<!-- AdSense kept for crawler preview -->
+<!-- AdSense -->
 <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2309008538670900" crossorigin="anonymous"></script>
 
 <style>
-  :root{
-    --accent1:#ff6b9d; --accent2:#c471ed;
-    --bg:linear-gradient(135deg,#0f1419 0,#1a2332 50%,#0d1117 100%);
-    --card-w:420px; --card-h:520px;
-  }
-  *{box-sizing:border-box}
-  html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial;color:#fff;background:var(--bg)}
-  .viewport{width:100%;height:100vh;display:flex;align-items:center;justify-content:center;padding:12px}
-  .card{width:var(--card-w);height:var(--card-h);background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));padding:14px;border-radius:12px;border:1px solid rgba(255,255,255,0.04);box-shadow:0 10px 30px rgba(0,0,0,0.5);display:flex;flex-direction:column;overflow:hidden}
-  .top{display:flex;align-items:center;justify-content:space-between}
-  .back-btn{background:transparent;border:0;color:rgba(255,255,255,0.9);cursor:pointer;font-weight:700}
-  h2{margin:0;font-size:16px}
-  .small{font-size:12px;color:rgba(255,255,255,0.78)}
-  .ad-player{width:100%;height:320px;border-radius:8px;overflow:hidden;background:#000;display:flex;align-items:center;justify-content:center;position:relative;margin-top:12px}
-  .ad-player video, .ad-player iframe{width:100%;height:100%;border:0;object-fit:cover}
-  .controls{display:flex;gap:8px;align-items:center;justify-content:center;margin-top:12px}
-  .btn{padding:8px 12px;border-radius:8px;background:linear-gradient(45deg,var(--accent1),var(--accent2));border:none;color:#fff;cursor:pointer;font-weight:700}
-  .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06)}
-  .note{margin-top:8px;color:rgba(255,255,255,0.6);font-size:12px;text-align:center}
-  .countdown{font-weight:700;font-size:18px;color:#fff}
-  .hidden{display:none}
-  .adsense-preview{margin-top:12px;display:flex;justify-content:center}
-  #dbg{position:absolute;left:12px;bottom:12px;padding:6px 8px;background:rgba(0,0,0,0.6);border-radius:6px;font-size:11px;color:#fff;z-index:50}
+:root{
+  --accent1:#ff6b9d; --accent2:#c471ed;
+  --bg:linear-gradient(135deg,#0f1419 0,#1a2332 50%,#0d1117 100%);
+  --card-w:420px; --card-h:520px;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial;color:#fff;background:var(--bg)}
+.viewport{width:100%;height:100vh;display:flex;align-items:center;justify-content:center;padding:12px}
+.card{width:var(--card-w);height:var(--card-h);background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));padding:14px;border-radius:12px;border:1px solid rgba(255,255,255,0.04);box-shadow:0 10px 30px rgba(0,0,0,0.5);display:flex;flex-direction:column;overflow:hidden}
+.top{display:flex;align-items:center;justify-content:space-between}
+.back-btn{background:transparent;border:0;color:rgba(255,255,255,0.9);cursor:pointer;font-weight:700}
+h2{margin:0;font-size:16px}
+.small{font-size:12px;color:rgba(255,255,255,0.78)}
+.ad-player{width:100%;height:320px;border-radius:8px;overflow:hidden;background:#000;display:flex;align-items:center;justify-content:center;position:relative;margin-top:12px}
+.ad-player video, .ad-player iframe{width:100%;height:100%;border:0;object-fit:cover}
+.controls{display:flex;gap:8px;align-items:center;justify-content:center;margin-top:12px}
+.btn{padding:8px 12px;border-radius:8px;background:linear-gradient(45deg,var(--accent1),var(--accent2));border:none;color:#fff;cursor:pointer;font-weight:700}
+.btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06)}
+.note{margin-top:8px;color:rgba(255,255,255,0.6);font-size:12px;text-align:center}
+.countdown{font-weight:700;font-size:18px;color:#fff}
+.hidden{display:none}
+.adsense-preview{margin-top:12px;display:flex;justify-content:center}
+#dbg{position:absolute;left:12px;bottom:12px;padding:6px 8px;background:rgba(0,0,0,0.6);border-radius:6px;font-size:11px;color:#fff;z-index:50}
 </style>
 </head>
 <body>
-  <div class="viewport">
-    <div class="card" id="root">
-      <div class="top">
-        <button id="btnClose" class="back-btn">✕</button>
-        <div style="text-align:right">
-          <div class="small" id="vipInfo">VIP: —</div>
-        </div>
+<div class="viewport">
+  <div class="card" id="root">
+    <div class="top">
+      <button id="btnClose" class="back-btn">✕</button>
+      <div style="text-align:right">
+        <div class="small" id="vipInfo">VIP: —</div>
       </div>
-
-      <div id="mainArea" class="small">
-        <div id="adWrap">
-          <div class="ad-player" id="adPlayer">
-            <div class="small" id="adPlaceholder">Ad player area — no ad loaded.</div>
-          </div>
-
-          <div class="controls" id="controls">
-            <div class="countdown" id="countdownEl">--</div>
-            <button id="claimBtn" class="btn" disabled>Claim</button>
-            <button id="skipBtn" class="btn ghost hidden">Skip</button>
-          </div>
-
-          <div class="note" id="adNote">Waiting for payload...</div>
-
-          <div class="adsense-preview" id="adSenseHolder" aria-hidden="true">
-            <ins class="adsbygoogle"
-                 style="display:inline-block;width:320px;height:50px"
-                 data-ad-client="ca-pub-2309008538670900"
-                 data-ad-slot="4194843603"></ins>
-          </div>
-
-        </div>
-      </div>
-
-      <div id="dbg" style="display:none">dbg</div>
     </div>
+
+    <div id="mainArea" class="small">
+      <div id="adWrap">
+        <div class="ad-player" id="adPlayer">
+          <div class="small" id="adPlaceholder">Initializing…</div>
+        </div>
+
+        <div class="controls" id="controls">
+          <div class="countdown" id="countdownEl">--</div>
+          <button id="claimBtn" class="btn" disabled>Claim</button>
+          <button id="skipBtn" class="btn ghost hidden">Skip</button>
+        </div>
+
+        <div class="note" id="adNote">Waiting for connection…</div>
+
+        <div class="adsense-preview" id="adSenseHolder">
+          <ins class="adsbygoogle"
+               style="display:inline-block;width:320px;height:50px"
+               data-ad-client="ca-pub-2309008538670900"
+               data-ad-slot="4194843603"></ins>
+        </div>
+      </div>
+    </div>
+
+    <div id="dbg" style="display:none">dbg</div>
   </div>
+</div>
 
 <script>
-/* ============================
-   Hosted — Ad Player (simplified + handshake fixed)
-   - Accepts payload via: postMessage {type:'start_payload', payload:{}}
-     AND via hash base64 (#<base64>) AND via ?start=<base64>
-   - Announces 'hosted_ready' with payload.ad_id (what gain.web expects)
-   - Sends 'ad_complete' with payload.ad_id on finish
-   - Distinguishes source: parent (gain.web) vs deeplink vs standalone
-   ============================ */
+/* GainGrid Hosted — Repaired for full handshake */
+const KEY_AUTH='gg_hosted_authoritative_payload';
+const KEY_PROFILE='gg_hosted_profile';
+const el=id=>document.getElementById(id);
+let profile=null,currentAd=null,adTimer=null,remaining=0,sourceType='standalone',isInteractive=false;
 
-/* ===== Keys & config ===== */
-const KEY_AUTH = 'gg_hosted_authoritative_payload';
-const KEY_PROFILE = 'gg_hosted_profile';
-const ADSENSE_CLIENT = "ca-pub-2309008538670900";
-const AD_DURATIONS = [30,40,50,60];
-const MIN_DEEPLINK_TIMER_OPTIONS = AD_DURATIONS.slice();
-const el = id => document.getElementById(id);
+function debugShow(t){const d=el('dbg');d.style.display='block';d.textContent=t;console.log('[hosted]',t);}
+function setVIPLabel(){try{const p=profile||JSON.parse(sessionStorage.getItem(KEY_PROFILE)||'{}');el('vipInfo').textContent=p.vip_level?('VIP: '+p.vip_level):'VIP: —';}catch{}}
 
-/* ===== State ===== */
-let profile = null;
-let currentAd = null; // { ad_id, secs, reward, source: 'parent'|'deeplink'|'standalone', user, meta }
-let adTimer = null;
-let remaining = 0;
-let sourceType = 'standalone'; // default
-let isInteractive = false; // only true when payload indicates action allowed (gain.web or deeplink)
+function postParent(msg){try{if(window.parent&&window.parent!==window)window.parent.postMessage(msg,'*');if(window.opener&&!window.opener.closed)window.opener.postMessage(msg,'*');}catch{}}
 
-/* ===== Utilities ===== */
-function nowDay(){ return new Date().toISOString().slice(0,10); }
-function rand(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
-function setVIPLabel(){ const p = profile || (JSON.parse(sessionStorage.getItem(KEY_PROFILE)||'null')||{}); const vip = p && (p.vip_level||p.vip) ? (p.vip_level||p.vip) : ''; if(el('vipInfo')) el('vipInfo').textContent = vip ? ('VIP: ' + vip) : 'VIP: —'; }
-function escapeHtml(s){ if(!s && s !== 0) return ''; return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-function debugShow(msg){ try{ const d = el('dbg'); if(d){ d.style.display='block'; d.textContent = msg; } console.log('hosted:', msg); }catch(e){} }
+function announceReady(){postParent({type:'hosted_ready',payload:{ts:Date.now(),ad_id:(currentAd&&currentAd.ad_id)||null}});debugShow('Ready — waiting for payload');}
 
-/* ===== Decode helpers ===== */
-function tryDecodePayloadString(raw){
-  if(!raw) return null;
-  try {
-    // url-encoded JSON
-    if(raw.startsWith('%7B') || raw.startsWith('%5B') || raw.indexOf('%22')!==-1){
-      try{ return JSON.parse(decodeURIComponent(raw)); }catch(e){}
-    }
-    // base64 url-safe
-    let norm = raw.replace(/\s+/g,'').replace(/-/g,'+').replace(/_/g,'/');
-    const pad = norm.length % 4;
-    if(pad === 2) norm += '=='; else if(pad === 3) norm += '=';
-    try {
-      const decoded = atob(norm);
-      try{ return JSON.parse(decoded); }catch(e){ return decoded; }
-    } catch(e){
-      try{ return JSON.parse(raw); }catch(e){ return null; }
-    }
-  } catch(err){ console.warn('tryDecodePayloadString err', err); return null; }
-}
-
-/* ===== process payload ===== */
-function processStartPayload(payload, src='parent'){
-  try {
-    if(!payload || typeof payload !== 'object') return;
-    // save authoritative
-    try{ sessionStorage.setItem(KEY_AUTH, JSON.stringify(payload)); }catch(e){}
-    // apply profile if present
-    if(payload.user && typeof payload.user === 'object'){ profile = Object.assign({}, profile||{}, payload.user); try{ sessionStorage.setItem(KEY_PROFILE, JSON.stringify(profile)); }catch(e){} setVIPLabel(); }
-    else if(payload.profile && typeof payload.profile === 'object'){ profile = Object.assign({}, profile||{}, payload.profile); try{ sessionStorage.setItem(KEY_PROFILE, JSON.stringify(profile)); }catch(e){} setVIPLabel(); }
-
-    // route: ad flow
-    if(payload.ad_id || payload.id || payload.type === 'ad' || payload.isAd){
-      const ad = {
-        ad_id: payload.ad_id || payload.id || ('host_ad_'+Date.now()),
-        secs: Number(payload.secs || payload.s || payload.duration) || null,
-        reward: Number(payload.reward || payload.r || payload.base) || 0,
-        vip_level: payload.vip_level || payload.vip || null,
-        user: payload.user || payload.user || null,
-        meta: payload.meta || null
-      };
-      // mark source based on caller
-      ad._source = src || 'parent';
-      startAdFlow(ad);
-      return;
-    }
-
-    // store only
-    el('adNote').textContent = 'Payload stored. Use UI to start ad.';
-  } catch(e){ console.warn('processStartPayload err', e); }
-}
-
-/* ===== startup: parse hash (base64) and query start param ===== */
-function parseHashOrQueryOnLoad(){
-  // Query param ?start= (deeplink)
-  try {
-    const qp = (function(){ const s = location.search.replace(/^\?/,''); const obj={}; if(!s) return obj; s.split('&').filter(Boolean).forEach(p=>{ const i=p.indexOf('='); if(i<0) obj[decodeURIComponent(p)]=''; else obj[decodeURIComponent(p.slice(0,i))]=decodeURIComponent(p.slice(i+1)); }); return obj; })();
-    if(qp.start){
-      const decoded = tryDecodePayloadString(qp.start);
-      if(decoded && typeof decoded === 'object'){ sourceType = 'deeplink'; processStartPayload(decoded, 'deeplink'); return; }
-      // if start is command string, do nothing special except mark deeplink
-      sourceType = 'deeplink';
-    }
-
-    const h = (location.hash || '').replace(/^#/,'');
-    if(!h) return;
-    // skip "#/path?..." style - only accept base64-ish direct payloads
-    if(h.indexOf('=') !== -1 || h.indexOf('&') !== -1 || h.indexOf('?') === 0) {
-      // handle path-like: #/ad?ad_id=...
-      const parts = h.split('?');
-      const path = parts[0].replace(/^\//,'').toLowerCase();
-      const qp2 = {};
-      if(parts[1]) parts[1].split('&').forEach(p=>{ const i=p.indexOf('='); if(i>=0) qp2[decodeURIComponent(p.slice(0,i))]=decodeURIComponent(p.slice(i+1)); else qp2[decodeURIComponent(p)]=''; });
-      if(path === 'ad' && (qp2.ad_id||qp2.id)){
-        sourceType = 'parent';
-        processStartPayload({ ad_id: qp2.ad_id||qp2.id, secs: qp2.secs||qp2.duration||null, reward: qp2.reward||qp2.base||0, user:{ user_id: qp2.user_id||null } }, 'parent');
-        return;
-      }
-      return;
-    }
-    const decoded = tryDecodePayloadString(decodeURIComponent(h));
-    if(decoded && typeof decoded === 'object'){
-      sourceType = 'parent';
-      processStartPayload(decoded, 'parent');
-    }
-  } catch(e){ console.warn('parseHashOrQueryOnLoad', e); }
-}
-
-/* ===== handshake: announce hosted_ready (what gain.web expects) ===== */
-function announceReady(){
-  try{
-    const stored = (function(){ try{ return JSON.parse(sessionStorage.getItem(KEY_AUTH)||'null'); }catch(e){return null;} })();
-    const ad_id = (stored && (stored.ad_id || stored.id)) ? (stored.ad_id || stored.id) : null;
-    const payload = { ts: Date.now(), href: location.href, ad_id: ad_id };
-    postParent({ type: 'hosted_ready', payload });
-    debugShow('hosted_ready sent' + (ad_id ? ' ad:' + ad_id : ''));
-  } catch(e){ console.warn('announceReady err', e); }
-}
-
-/* helper: post to parent/opener safe */
-function postParent(msg){
-  try{ if(window.parent && window.parent !== window) window.parent.postMessage(msg, '*'); }catch(e){}
-  try{ if(window.opener && !window.opener.closed) window.opener.postMessage(msg, '*'); }catch(e){}
-  console.log('postParent:', msg);
-}
-
-/* ===== message listener (accept start_payload, ping_hosted, etc) ===== */
-window.addEventListener('message', function(ev){
-  try{
-    const d = ev && ev.data;
-    if(!d || typeof d !== 'object') return;
-    // ping -> reply
-    if(d.type === 'ping_hosted'){
-      try{ (ev.source && ev.source.postMessage) && ev.source.postMessage({ type: 'hosted_pong', payload:{ ts: Date.now() } }, '*'); }catch(e){}
-      return;
-    }
-    // start payload from parent
-    if(d.type === 'start_payload' && d.payload){
-      sourceType = 'parent';
-      isInteractive = true;
-      processStartPayload(d.payload, 'parent');
-      return;
-    }
-    // direct open ad/task commands from parent
-    if(d.type === 'open_ad' && d.payload && (d.payload.ad_id || d.payload.id)){
-      sourceType = 'parent';
-      isInteractive = true;
-      processStartPayload(d.payload, 'parent');
-      return;
-    }
-    if(d.type === 'open_task' && d.payload && (d.payload.task_id || d.payload.id)){
-      // tasks removed by user's request - ignore or forward as stored
-      sourceType = 'parent';
-      isInteractive = true;
-      // if you want task flow, implement here
-      return;
-    }
-    // profile_response may arrive from parent
-    if(d.type === 'profile_response' && d.payload){
-      profile = Object.assign({}, profile||{}, d.payload);
-      try{ sessionStorage.setItem(KEY_PROFILE, JSON.stringify(profile)); }catch(e){}
-      setVIPLabel();
-      return;
-    }
-  }catch(err){ console.warn('hosted message err', err); }
-}, false);
-
-/* ===== render / UI helpers ===== */
-function renderPlayerWithVideo(src){
-  const wrap = el('adPlayer');
-  wrap.innerHTML = '';
-  const video = document.createElement('video');
-  video.src = src || "https://storage.googleapis.com/interactive-media-ads/media/big_buck_bunny_trailer.mp4";
-  video.autoplay = true; video.muted = true; video.playsInline = true; video.controls = false;
-  video.style.width = '100%'; video.style.height = '100%';
-  wrap.appendChild(video);
-  try{ video.play().catch(()=>{}); }catch(e){}
-  return video;
-}
-
-/* ===== start ad flow ===== */
-function startAdFlow(ad){
-  try{
-    if(!ad || !ad.ad_id) return;
-    currentAd = Object.assign({}, ad);
-    // decide interactivity
-    if(sourceType === 'parent' || sourceType === 'deeplink') isInteractive = true;
-    else isInteractive = false;
-
-    // normalize secs
-    const secs = Number(ad.secs) || AD_DURATIONS[Math.floor(Math.random()*AD_DURATIONS.length)];
-    currentAd.secs = secs;
-
-    // record last payload for debug/parent
-    try{ sessionStorage.setItem('gg_hosted_last_ad_payload', JSON.stringify(currentAd)); }catch(e){}
-
-    // prepare UI
-    el('adNote').textContent = `Watching ${escapeHtml(currentAd.ad_id)} — auto validates after ${secs}s`;
-    el('countdownEl').textContent = secs;
-    el('claimBtn').disabled = true;
-    el('skipBtn').classList.add('hidden');
-    el('adPlaceholder') && (el('adPlaceholder').style.display='none');
-
-    // show ad player
-    const video = renderPlayerWithVideo(currentAd.video || null);
-
-    remaining = secs;
-    if(adTimer) { clearInterval(adTimer); adTimer = null; }
-    adTimer = setInterval(()=> {
-      remaining--;
-      el('countdownEl').textContent = remaining;
-      if(remaining <= 0){
-        clearInterval(adTimer); adTimer = null;
-        el('claimBtn').disabled = false;
-        if(isInteractive){
-          // label depends on source
-          if(sourceType === 'parent'){
-            el('claimBtn').textContent = 'Claim / Back to Dash';
-            el('skipBtn').classList.add('hidden');
-          } else if(sourceType === 'deeplink'){
-            el('claimBtn').textContent = 'Claim';
-            el('skipBtn').classList.remove('hidden');
-            el('skipBtn').textContent = 'Back to Game';
-          }
-        } else {
-          // standalone — buttons remain disabled/inactive
-          el('claimBtn').disabled = true;
-          el('adNote').textContent = 'No controller available (standalone).';
-        }
-
-        // auto-send result if interactive and source parent requested automatic ad_complete
-        if(isInteractive && sourceType === 'parent'){
-          // finalize automatically for parent flows
-          finalizeAdSuccess({ auto:true });
-        }
-        // for deeplink, we wait for user to Claim or skip
-      }
-    }, 1000);
-
-    // attach claim handler
-    attachClaimHandler();
-
-    // announce opened to parent (useful for handshake)
-    postParent({ type: 'hosted_opened', payload: { ad_id: currentAd.ad_id, meta:{ ts: Date.now() } } });
-
-    // announce hosted_ready (immediately) — ensures gain.web picks it up
-    announceReady();
-
-  } catch(e){ console.warn('startAdFlow', e); }
-}
-
-/* ===== finalize (success) ===== */
-function finalizeAdSuccess(opts){
-  try{
-    const ad = currentAd;
-    if(!ad) return;
-    // prepare payload to send to parent
-    const payload = {
-      ad_id: ad.ad_id,
-      reward: ad.reward || 0,
-      base: ad.base || ad.reward || 0,
-      vip_bonus: ad.vip_bonus || 0,
-      vip_level: ad.vip_level || null,
-      user_id: (ad.user && ad.user.user_id) || (profile && profile.user_id) || null,
-      status: 'completed',
-      meta: Object.assign({ ts: Date.now(), auto: !!(opts && opts.auto) }, ad.meta || {})
-    };
-
-    // send ad_complete to parent/opener
-    postParent({ type: 'ad_complete', payload });
-
-    // attempt webhook if present in stored authoritative payload
-    try{
-      const auth = (function(){ try{ return JSON.parse(sessionStorage.getItem(KEY_AUTH)||'null'); }catch(e){return null;} })();
-      const wh = (auth && (auth.webhook || auth.callback || auth.hook || auth.url)) || null;
-      if(wh){
-        fetch(wh, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ action:'ads_validate', payload }), keepalive:true }).catch(()=>{});
-      }
-    }catch(e){ console.warn('webhook attempt err', e); }
-
-    // persist last ad payload
-    try{ sessionStorage.setItem('gg_hosted_last_ad_payload', JSON.stringify(payload)); }catch(e){}
-
-    // Clean up authoritative payload
-    try{ sessionStorage.removeItem(KEY_AUTH); }catch(e){}
-
-    // show note & optionally close (parent will close or gain.web may handle it)
-    el('adNote').textContent = 'Ad finished — validated.';
-    // If opened by deeplink, optionally redirect or close
-    if(sourceType === 'deeplink'){
-      // For deeplink we keep UI so user can press Back to Game / Skip
-      el('skipBtn').classList.remove('hidden');
-      el('skipBtn').textContent = 'Back to Game';
-    } else if(sourceType === 'parent'){
-      // ask parent to close after a short delay
-      setTimeout(()=> postParent({ type:'close_hosted', reason: 'ad_done', payload }), 800);
-    }
-
-    // stop video player if exists
-    try{ const v = el('adPlayer').querySelector('video'); if(v){ v.pause(); v.src=''; } }catch(e){}
-
-    // set currentAd null for safety
-    currentAd = null;
-  } catch(e){ console.warn('finalizeAdSuccess', e); }
-}
-
-/* ===== claim button handler wiring ===== */
-function attachClaimHandler(){
-  try{
-    const claim = el('claimBtn');
-    const skip = el('skipBtn');
-    // remove old handlers by cloning
-    const newClaim = claim.cloneNode(true);
-    claim.parentNode.replaceChild(newClaim, claim);
-
-    newClaim.addEventListener('click', ()=> {
-      if(newClaim.disabled) return;
-      // finalize and send ad_complete
-      finalizeAdSuccess({ manual:true });
-      // If deeplink, optionally redirect or close window
-      if(sourceType === 'deeplink'){
-        // send postMessage to opener/parent for game resume if needed
-        postParent({ type: 'hosted_action', payload: { action: 'back_to_game', ad_id: (currentAd && currentAd.ad_id) } });
-      }
-    });
-
-    // skip button (for deeplink Back to Game)
-    const newSkip = skip.cloneNode(true);
-    skip.parentNode.replaceChild(newSkip, skip);
-    newSkip.addEventListener('click', ()=>{
-      // if skip visible, close hosted or navigate back
-      postParent({ type: 'hosted_action', payload: { action: 'skip_back', reason:'user' } });
-      try{ if(window.close) window.close(); }catch(e){}
-    });
-  }catch(e){ console.warn('attachClaimHandler', e); }
-}
-
-/* ===== clear UI / placeholder when no payload (standalone) ===== */
-function showStandaloneShell(){
-  el('adPlayer').innerHTML = '<div class="small" style="color:#ddd">No ad loaded — public preview only</div>';
-  el('countdownEl').textContent = '--';
-  el('claimBtn').disabled = true;
-  el('adNote').textContent = 'This public page shows ad player container only. No validation is possible without a payload.';
-  // ensure handshake still advertised (so other parents can detect presence)
-  announceReady();
-}
-
-/* ===== helpers: parse hash payload on boot ASAP ===== */
-(function boot(){
-  try{
-    parseHashOrQueryOnLoad();
-    setTimeout(()=> announceReady(), 50); // ensure parent knows we are present early
-    // If no payload detected, show standalone shell
-    const auth = (function(){ try{ return JSON.parse(sessionStorage.getItem(KEY_AUTH)||'null'); }catch(e){return null;} })();
-    if(!auth && sourceType === 'standalone'){
-      showStandaloneShell();
-    }
-  }catch(e){ console.warn('boot err', e); }
-})();
-
-/* ===== page close / close button behavior ===== */
-el('btnClose').addEventListener('click', ()=>{
-  try{
-    postParent({ type: 'close_hosted', reason: 'user_closed' });
-    if(window.close) window.close();
-  }catch(e){}
+/* receive data from gain.web */
+window.addEventListener('message',ev=>{
+  const d=ev.data||{};
+  if(d.type==='ping_hosted'){postParent({type:'hosted_pong',payload:{ts:Date.now()}});}
+  if(d.type==='start_payload'&&d.payload){sourceType='parent';isInteractive=true;processPayload(d.payload);}
+  if(d.type==='open_ad'&&d.payload){sourceType='parent';isInteractive=true;processPayload(d.payload);}
+  if(d.type==='open_task'&&d.payload){sourceType='parent';isInteractive=true;processPayload(d.payload);}
+  if(d.type==='profile_response'&&d.payload){profile=d.payload;sessionStorage.setItem(KEY_PROFILE,JSON.stringify(profile));setVIPLabel();}
 });
 
-/* ===== EXPOSE some debug helpers on window for console usage ===== */
-window.__hosted_process = processStartPayload;
-window.__hosted_clear = function(){ try{ sessionStorage.removeItem(KEY_AUTH); sessionStorage.removeItem(KEY_PROFILE); profile=null; setVIPLabel(); showStandaloneShell(); }catch(e){} };
-window.__hosted_state = ()=> ({ profile, currentAd, sourceType });
+/* decode and handle incoming payload */
+function processPayload(p){
+  if(!p)return;
+  try{sessionStorage.setItem(KEY_AUTH,JSON.stringify(p));}catch{}
+  if(p.user){profile=p.user;sessionStorage.setItem(KEY_PROFILE,JSON.stringify(profile));setVIPLabel();}
+  const id=p.ad_id||p.task_id||p.id||('unit_'+Date.now());
+  const secs=Number(p.secs||p.duration||30);
+  const reward=Number(p.reward||p.base||0);
+  currentAd={ad_id:id,secs:secs,reward:reward,vip_level:p.vip_level||null,type:p.type||'ad'};
+  startPlayback(currentAd);
+}
 
-/* ===== finished ===== */
+/* show player and count down */
+function startPlayback(ad){
+  const v=el('adPlayer');v.innerHTML='';
+  const vid=document.createElement('video');
+  vid.src="https://storage.googleapis.com/interactive-media-ads/media/big_buck_bunny_trailer.mp4";
+  vid.autoplay=true;vid.muted=true;vid.playsInline=true;
+  v.appendChild(vid);vid.play().catch(()=>{});
+  el('adNote').textContent='Playing '+ad.ad_id+' — '+ad.secs+'s';
+  el('countdownEl').textContent=ad.secs;
+  remaining=ad.secs;
+  if(adTimer)clearInterval(adTimer);
+  adTimer=setInterval(()=>{
+    remaining--;
+    el('countdownEl').textContent=remaining;
+    if(remaining<=0){clearInterval(adTimer);adTimer=null;finishAd();}
+  },1000);
+}
+
+/* complete & report */
+function finishAd(){
+  if(!currentAd)return;
+  const payload={
+    ad_id:currentAd.ad_id,
+    reward:currentAd.reward,
+    vip_level:currentAd.vip_level,
+    user_id:(profile&&profile.user_id)||null,
+    status:'completed',ts:Date.now()
+  };
+  postParent({type:(currentAd.type==='task'?'task_complete':'ad_complete'),payload});
+  sessionStorage.removeItem(KEY_AUTH);
+  el('adNote').textContent='✅ Completed & sent.';
+  el('countdownEl').textContent='✔';
+  setTimeout(()=>announceReady(),1000);
+  currentAd=null;
+}
+
+/* close button */
+el('btnClose').onclick=()=>{postParent({type:'close_hosted',reason:'user'});window.close&&window.close();};
+
+/* startup */
+window.addEventListener('load',()=>{
+  announceReady();
+  setVIPLabel();
+  const stored=sessionStorage.getItem(KEY_AUTH);
+  if(stored){try{const p=JSON.parse(stored);processPayload(p);}catch{}}
+  (adsbygoogle=window.adsbygoogle||[]).push({});
+});
 </script>
 </body>
 </html>
