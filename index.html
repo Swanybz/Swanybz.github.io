@@ -1,389 +1,135 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
-<title>GainGrid Hosted — Ad Player</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet"/>
-<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-2309008538670900" crossorigin="anonymous"></script>
-
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>GainGrid Hosted — Tasks & Ads</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
-:root{--accent1:#ff6b9d;--accent2:#c471ed;--bg:linear-gradient(135deg,#0f1419 0,#1a2332 50%,#0d1117 100%);}
-*{box-sizing:border-box} html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial;color:#fff;background:var(--bg)}
-.viewport-wrap{width:100%;height:100vh;display:flex;align-items:center;justify-content:center;padding:12px}
-.card{width:var(--card-width,420px);height:var(--card-height,520px);background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));padding:14px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);box-shadow:0 10px 30px rgba(0,0,0,0.5);display:flex;flex-direction:column;overflow:hidden}
-.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex:0 0 auto}
-.back-btn{background:transparent;border:0;color:rgba(255,255,255,0.9);cursor:pointer;font-weight:700}
-h2{margin:0;font-size:16px}
-.small{font-size:12px;color:rgba(255,255,255,0.78)}
-.btn{padding:8px 10px;border-radius:8px;background:linear-gradient(45deg,var(--accent1),var(--accent2));border:none;color:#fff;cursor:pointer;font-weight:700}
-.btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06)}
-.content{flex:1 1 auto;overflow:hidden;display:flex;flex-direction:column}
-.ad-player{width:100%;height:var(--ad-height,300px);border-radius:8px;overflow:hidden;background:#000;display:flex;align-items:center;justify-content:center;position:relative;margin-top:12px}
-.ad-player iframe,.ad-player video{width:100%;height:100%;border:0;object-fit:cover}
-.note{margin-top:8px;color:rgba(255,255,255,0.6);font-size:12px}
-.countdown{font-weight:700;font-size:18px;color:#fff}
-.hidden{display:none}
-.dbg{position:absolute;left:8px;bottom:8px;padding:6px 8px;background:rgba(0,0,0,0.6);border-radius:6px;font-size:11px;color:#fff;z-index:50}
-.controls{display:flex;gap:8px;justify-content:center;margin-top:12px}
-.small-muted{font-size:11px;color:rgba(255,255,255,0.5);text-align:center;margin-top:8px}
+:root{
+  --grad1:#ff6b9d;--grad2:#c471ed;
+  --bg:linear-gradient(135deg,#0f1419 0,#1a2332 50%,#0d1117 100%);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;height:100%;background:var(--bg);color:#fff;font-family:Inter,system-ui}
+.main{display:flex;align-items:center;justify-content:center;height:100vh;padding:16px}
+.card{width:420px;max-width:100%;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.05);border-radius:16px;padding:16px;box-shadow:0 10px 25px rgba(0,0,0,0.5);display:flex;flex-direction:column}
+.head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+button{cursor:pointer}
+.btn{background:linear-gradient(45deg,var(--grad1),var(--grad2));border:none;color:#fff;padding:8px 12px;border-radius:8px;font-weight:700}
+.btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.1)}
+.info{font-size:12px;color:rgba(255,255,255,0.7);margin-top:4px}
+.player{flex:1;background:#000;display:flex;align-items:center;justify-content:center;border-radius:8px;overflow:hidden;margin-top:8px;position:relative}
+.player video,.player iframe{width:100%;height:100%;border:0;object-fit:cover}
+.bottom{margin-top:10px;display:flex;justify-content:center;gap:8px;align-items:center}
+.countdown{font-size:18px;font-weight:700}
+.note{font-size:12px;color:rgba(255,255,255,0.6);text-align:center;margin-top:8px}
 </style>
 </head>
 <body>
-  <div class="viewport-wrap">
-    <div class="card" id="root">
-      <div class="topbar">
-        <button id="backBtn" class="back-btn">← Back</button>
-        <div style="text-align:right">
-          <div class="small" id="vipInfo">VIP: —</div>
-        </div>
-      </div>
+<div class="main">
+ <div class="card">
+   <div class="head">
+     <div><b id="taskType">Initializing…</b></div>
+     <button class="btn ghost" id="closeBtn">×</button>
+   </div>
 
-      <div class="content">
-        <div id="main" class="small">Initializing…</div>
+   <div class="player" id="adPlayer"><div id="loadingTxt">Waiting for Gain.web…</div></div>
 
-        <!-- Ad player area -->
-        <div id="adWrap" class="ad-player" role="region" aria-label="Ad player">
-          <!-- content populated by JS -->
-          <div class="small" id="adPlaceholder">Ad player area</div>
-        </div>
+   <div class="bottom">
+     <div class="countdown" id="timer">--</div>
+     <button class="btn" id="claimBtn" disabled>Claim</button>
+   </div>
 
-        <div id="controls" class="controls hidden">
-          <button id="openBtn" class="btn">Open & Start</button>
-          <button id="claimBtn" class="btn" disabled>Claim</button>
-          <button id="retBtn" class="btn ghost hidden">Close</button>
-        </div>
-
-        <div id="adNote" class="note small-muted">Waiting for payload...</div>
-      </div>
-
-      <div class="dbg" id="hostedDbg">hosted:init</div>
-    </div>
-  </div>
+   <div class="note" id="noteTxt">Preparing environment…</div>
+ </div>
+</div>
 
 <script>
-/* ================= Hosted Ad Viewer — Compatible with gain.web glue ================= */
+/* GainGrid Hosted — Original handshake repaired */
+const PLAYER= document.getElementById('adPlayer');
+const NOTE= document.getElementById('noteTxt');
+const TIMER= document.getElementById('timer');
+const CLAIM= document.getElementById('claimBtn');
+const TYPE= document.getElementById('taskType');
+let countdown=null, left=0, active=null;
 
-/* CONFIG — don't change these names (gain.web expects them) */
-const KEY_AUTH = 'gg_hosted_authoritative_payload';
-const KEY_PROFILE = 'gg_hosted_profile';
-const AD_DURATIONS = [30,40,50,60];
-const ADSENSE_CLIENT = "ca-pub-2309008538670900";
-
-/* Small utils  */
-const el = id => document.getElementById(id);
-function nowDay(){ return new Date().toISOString().slice(0,10); }
-function rand(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
-function __dbg(msg){ try{ const d = el('hostedDbg'); if(d) d.textContent = 'hosted:' + String(msg).slice(0,28); console.log('hosted:', msg); }catch(e){} }
-
-/* safe post to parent */
-function postParent(msg){
-  try{ if(window.parent && window.parent !== window) window.parent.postMessage(msg, '*'); }catch(e){}
-  try{ if(window.opener && !window.opener.closed) window.opener.postMessage(msg, '*'); }catch(e){}
-  __dbg('posted:' + (msg.type||'msg'));
-}
-
-/* try decode base64/url/json from a string */
-function tryDecodePayloadString(raw){
-  if(!raw) return null;
-  try {
-    // URL-encoded JSON
-    if(raw.startsWith('%7B') || raw.startsWith('%5B') || raw.indexOf('%22')!==-1){
-      try{ return JSON.parse(decodeURIComponent(raw)); }catch(e){}
-    }
-    // base64 (URL-safe)
-    let norm = raw.replace(/\s+/g,'').replace(/-/g,'+').replace(/_/g,'/');
-    const pad = norm.length % 4;
-    if(pad === 2) norm += '=='; else if(pad === 3) norm += '=';
-    try {
-      const decoded = atob(norm);
-      try{ return JSON.parse(decoded); }catch(e){ return decoded; }
-    } catch(e){
-      try{ return JSON.parse(raw); }catch(e){ return null; }
-    }
-  } catch(err){ console.warn('tryDecodePayloadString err', err); return null; }
-}
-
-/* Read profile from storage (hosted may be opened repeatedly) */
-let profile = null;
-function applyUserData(u){
-  if(!u) return;
-  profile = Object.assign({}, profile || {}, u);
-  try{ sessionStorage.setItem(KEY_PROFILE, JSON.stringify(profile)); }catch(e){}
-  try{ if(el('vipInfo')) el('vipInfo').textContent = profile.vip_level ? ('VIP: ' + profile.vip_level) : (profile.vip ? ('VIP: ' + profile.vip) : 'VIP: —'); }catch(e){}
-}
-
-/* Central processing of start payload object */
-function processStartPayload(payload){
-  if(!payload || typeof payload !== 'object') return;
-  try{
-    // store authoritative payload
-    try{ sessionStorage.setItem(KEY_AUTH, JSON.stringify(payload)); }catch(e){}
-    // extract profile
-    if(payload.user && typeof payload.user === 'object') applyUserData(payload.user);
-    else if(payload.profile && typeof payload.profile === 'object') applyUserData(payload.profile);
-    else if(payload.vip_level && (!profile || !profile.vip_level)) { profile = profile || {}; profile.vip_level = payload.vip_level; try{ if(el('vipInfo')) el('vipInfo').textContent = 'VIP: ' + payload.vip_level; }catch(e){} }
-
-    // route to ad flow
-    if(payload.ad_id || payload.id || payload.isAd || payload.type === 'ad'){
-      const ad = {
-        ad_id: payload.ad_id || payload.id,
-        secs: Number(payload.secs || payload.s || payload.duration) || null,
-        reward: Number(payload.reward || payload.r || payload.base) || null,
-        vip_level: payload.vip_level || payload.vip || null,
-        user: payload.user || (payload.user_id ? { user_id: payload.user_id } : null),
-        webhook: payload.webhook || payload.callback || payload.hook || payload.url || null,
-        meta: payload.meta || {}
-      };
-      // launch ad flow
-      renderAdFlow(ad);
-      return;
-    }
-
-    // otherwise just show stored state
-    el('main').innerHTML = '<div class="small">Payload stored. Use UI to start ad.</div>';
-  }catch(err){ console.warn('processStartPayload err', err); }
-}
-
-/* parse hash payload on boot */
-(function parseHashOnBoot(){
-  try{
-    const h = (location.hash || '').replace(/^#/,'');
-    if(!h) return;
-    // ignore normal query-like hashes
-    if(h.indexOf('=') !== -1 || h.indexOf('&') !== -1 || h.indexOf('?') === 0) return;
-    const decoded = tryDecodePayloadString(decodeURIComponent(h));
-    if(decoded && typeof decoded === 'object'){ processStartPayload(decoded); return; }
-    // also support path-like: #/ad?... handled by router fallback above
-  }catch(e){ console.warn('parseHashOnBoot', e); }
-})();
-
-/* announce ready to parent (handshake) */
+/* === announce ready to Gain.web === */
 function announceReady(){
-  try{
-    const auth = (function(){ try{ return JSON.parse(sessionStorage.getItem(KEY_AUTH)||'null'); }catch(e){return null;} })();
-    const payload = { ts: Date.now(), href: location.href };
-    if(auth && (auth.ad_id || auth.id)) payload.ad_id = (auth.ad_id || auth.id);
-    postParent({ type: 'hosted_ready', payload });
-    __dbg('ready' + (payload.ad_id ? ' ad:' + payload.ad_id : ''));
-  }catch(e){ console.warn('announceReady', e); }
+  post({type:'_GG_HOSTED_READY', time:Date.now()});
+  NOTE.textContent='Ready for connection…';
 }
 
-/* small helper to clear authoritative payload after use */
-function clearStartPayload(){ try{ sessionStorage.removeItem(KEY_AUTH); sessionStorage.removeItem(KEY_PROFILE); profile=null; if(el('vipInfo')) el('vipInfo').textContent='VIP: —'; }catch(e){} }
-
-/* helper to inject Adsterra iframe code (keeps your earlier implementation) */
-function injectAdsterraInto(holder){
+/* === handle incoming payload === */
+function handlePayload(data){
+  if(!data)return;
   try{
-    const h = (typeof holder === 'string') ? document.getElementById(holder) : holder;
-    if(!h) return;
-    h.innerHTML = '';
-    const wrap = document.createElement('div');
-    wrap.style.width = '468px'; wrap.style.maxWidth='100%'; wrap.style.height = '60px'; wrap.style.margin='0 auto';
-    const s1 = document.createElement('script'); s1.type='text/javascript';
-    s1.text = "atOptions = { 'key' : 'a8702b8b4c48420a3815542007f1c0df', 'format' : 'iframe', 'height' : 60, 'width' : 468, 'params' : {} };";
-    wrap.appendChild(s1);
-    const s2 = document.createElement('script'); s2.type='text/javascript'; s2.src = "//www.highperformanceformat.com/a8702b8b4c48420a3815542007f1c0df/invoke.js";
-    wrap.appendChild(s2);
-    h.appendChild(wrap);
-  }catch(e){ console.warn('injectAdsterraInto', e); }
-}
-
-/* ===== AD FLOW Implementation ===== */
-let currentAd = null;
-let adTimerInterval = null;
-let expectedEnd = null;
-let finished = false;
-
-function renderAdFlow(ad){
-  try{
-    // combine with stored authoritative (if any)
-    const auth = (function(){ try{ return JSON.parse(sessionStorage.getItem(KEY_AUTH) || 'null'); }catch(e){return null;} })();
-    const combined = Object.assign({}, auth || {}, ad || {});
-    const ad_id = combined.ad_id || combined.id || ('host_ad_' + Date.now());
-    const secs = Number(combined.secs) || AD_DURATIONS[Math.floor(Math.random()*AD_DURATIONS.length)];
-    const reward = Number(combined.reward) || (combined.base || 0);
-    const vip = combined.vip_level || combined.vip || (profile && profile.vip_level) || 'none';
-    const user = combined.user || (profile && profile) || null;
-
-    currentAd = { ad_id, secs, reward, vip, user, webhook: combined.webhook || null, meta: combined.meta || {} };
-
-    // store last ad payload (debug)
-    try{ sessionStorage.setItem('gg_hosted_last_ad_payload', JSON.stringify(currentAd)); }catch(e){}
-
-    // Build UI
-    el('main').innerHTML = `<div class="small">Watching: <strong>${escapeHtml(ad_id)}</strong> — Reward: <strong>${reward} G</strong></div>`;
-    const adNode = el('adWrap');
-    adNode.innerHTML = '';
-    // prefer embedding a muted autoplaying video as fallback
-    const video = document.createElement('video');
-    video.src = "https://storage.googleapis.com/interactive-media-ads/media/big_buck_bunny_trailer.mp4";
-    video.autoplay = true; video.muted = true; video.playsInline = true; video.controls = false;
-    video.style.width = '100%'; video.style.height = '100%';
-    adNode.appendChild(video);
-    try{ video.play().catch(()=>{}); }catch(e){}
-
-    // Setup controls and countdown
-    el('adNote').textContent = `Auto-completes after ${secs}s`;
-    el('controls').classList.remove('hidden');
-    el('openBtn').classList.add('hidden'); // not used when we render in-place
-    el('claimBtn').disabled = true;
-    el('retBtn').classList.add('hidden');
-
-    // announce to parent that hosted opened with payload
-    postParent({ type: 'hosted_opened', payload: { ad_id } });
-    // send hosted_ready handshake quickly so parent can start timers
-    postParent({ type: 'hosted_ready', payload: { ad_id } });
-
-    // countdown
-    let remaining = secs;
-    const countEl = document.createElement('div'); countEl.className = 'countdown'; countEl.id = 'adCount';
-    el('controls').insertBefore(countEl, el('claimBtn'));
-
-    if(adTimerInterval) clearInterval(adTimerInterval);
-    countEl.textContent = remaining;
-    expectedEnd = Date.now() + secs*1000;
-    adTimerInterval = setInterval(()=>{
-      remaining--;
-      countEl.textContent = remaining;
-      if(remaining <= 0){
-        clearInterval(adTimerInterval);
-        adTimerInterval = null;
-        // enable claim
-        el('claimBtn').disabled = false;
-        el('adNote').textContent = 'Ad finished. Sending result...';
-        // prepare payload
-        const payload = {
-          ad_id, reward, base: reward, vip_bonus: 0, vip_level: vip,
-          user_id: (user && user.user_id) || (profile && profile.user_id) || null,
-          status: 'completed', meta: { ts: Date.now(), fingerprint: (currentAd.meta && currentAd.meta.fingerprint) || null }
-        };
-        // send to parent
-        postParent({ type: 'ad_complete', payload });
-        postParent({ type: 'task_complete', payload }); // compatibility
-        // attempt webhook (non-blocking)
-        if(currentAd.webhook){
-          try{ fetch(currentAd.webhook, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'ads_validate', payload }), keepalive:true }).catch(()=>{}); }catch(e){}
-        }
-        // cleanup session key
-        try{ sessionStorage.removeItem(KEY_AUTH); }catch(e){}
-        // show return button
-        el('retBtn').classList.remove('hidden');
-        el('retBtn').textContent = 'Close';
-        // auto-close if opened as popup window (e.g. deeplink) — best-effort
-        setTimeout(()=> {
-          try{ postParent({ type:'close_hosted', reason:'ad_done', payload }); }catch(e){}
-        }, 900);
-      }
-    }, 1000);
-
-    // claim button
-    el('claimBtn').onclick = function(){
-      if(el('claimBtn').disabled) return;
-      el('claimBtn').disabled = true;
-      const payload = { ad_id, reward, vip_level: vip, user_id: (user && user.user_id) || null, status:'claimed', ts: Date.now() };
-      postParent({ type: 'ad_complete', payload });
-      try{ sessionStorage.removeItem(KEY_AUTH); }catch(e){}
-      el('retBtn').classList.remove('hidden'); el('retBtn').textContent = 'Close';
-    };
-
-    el('retBtn').onclick = function(){
-      postParent({ type:'close_hosted', reason:'user_return' });
-      // attempt to close
-      try{ if(window.close) window.close(); }catch(e){}
-    };
-
-  }catch(err){
-    console.warn('renderAdFlow err', err);
-    el('main').innerHTML = '<div class="small">Unable to start ad view.</div>';
+    const {id,secs,reward,type,vip_level,user_id,from}=data;
+    active={id,secs,reward,type,vip_level,user_id};
+    sessionStorage.setItem('GG_ACTIVE_PAYLOAD',JSON.stringify(active));
+    TYPE.textContent= type==='task' ? 'Task Board' : 'Ad Session';
+    NOTE.textContent='Connected ✓';
+    startPlay();
+  }catch(e){
+    NOTE.textContent='Error parsing payload';
   }
 }
 
-/* helper: escapeHtml */
-function escapeHtml(s){ if(!s && s !== 0) return ''; return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+/* === start playback or display === */
+function startPlay(){
+  PLAYER.innerHTML='';
+  const vid=document.createElement('video');
+  vid.src='https://storage.googleapis.com/interactive-media-ads/media/big_buck_bunny_trailer.mp4';
+  vid.autoplay=true;vid.muted=true;vid.playsInline=true;
+  PLAYER.appendChild(vid);
+  left=active.secs||30;
+  TIMER.textContent=left;
+  if(countdown)clearInterval(countdown);
+  countdown=setInterval(()=>{
+    left--;TIMER.textContent=left;
+    if(left<=0){clearInterval(countdown);finish();}
+  },1000);
+  NOTE.textContent='Playing '+active.id+' ('+left+'s)';
+}
 
-/* message receiver from parent (e.g. parent asking for profile or sending payload) */
-window.addEventListener('message', function(ev){
+/* === finish and report back === */
+function finish(){
+  TIMER.textContent='✔';
+  NOTE.textContent='Completed successfully';
+  CLAIM.disabled=false;
+  CLAIM.onclick=()=>{
+    post({type:'_GG_HOSTED_DONE', payload:active});
+    CLAIM.disabled=true;
+    NOTE.textContent='Reported back ✓';
+    sessionStorage.removeItem('GG_ACTIVE_PAYLOAD');
+    setTimeout(()=>announceReady(),1200);
+  };
+}
+
+/* === bridge post === */
+function post(obj){
   try{
-    const data = ev && ev.data;
-    if(!data || typeof data !== 'object') return;
-    // parent asking for profile
-    if(data.type === 'profile_request'){
-      const p = profile || (JSON.parse(sessionStorage.getItem(KEY_PROFILE)||'null')||{});
-      try{ postParent({ type:'profile_response', payload: p }); }catch(e){}
-      return;
-    }
-    // parent sending start_payload directly
-    if(data.type === 'start_payload' && data.payload){
-      processStartPayload(data.payload);
-      return;
-    }
-    // parent telling to open ad (rare)
-    if(data.type === 'open_ad' && data.payload && (data.payload.ad_id || data.payload.id)){
-      try{ processStartPayload(data.payload); }catch(e){}
-      return;
-    }
-  }catch(e){ console.warn('hosted received msg err', e); }
-}, false);
+    if(window.parent && window.parent!==window) window.parent.postMessage(obj,'*');
+    if(window.opener && !window.opener.closed) window.opener.postMessage(obj,'*');
+  }catch(e){console.warn(e);}
+}
 
-/* Boot: announce ready quickly (parent expects hosted_ready) */
-if(document.readyState === 'complete' || document.readyState === 'interactive') setTimeout(announceReady, 30);
-else document.addEventListener('DOMContentLoaded', ()=> setTimeout(announceReady, 30));
-
-/* Also handle querystring deeplink support (Telegram start base64 or ?ad_id=) */
-(function parseQueryStart(){
-  try{
-    const qs = (function(){ const s = location.search.replace(/^\?/,''); if(!s) return {}; return s.split('&').filter(Boolean).map(p=>{ const i=p.indexOf('='); if(i<0) return [decodeURIComponent(p),'']; const k=decodeURIComponent(p.slice(0,i)); const v=decodeURIComponent(p.slice(i+1)); return [k,v]; }).reduce((acc,[k,v])=>{ if(acc[k]===undefined) acc[k]=v; else if(Array.isArray(acc[k])) acc[k].push(v); else acc[k]=[acc[k],v]; return acc; }, {}); })();
-
-    // prioritize start base64
-    if(qs.start){
-      let raw = qs.start;
-      let decoded = null;
-      try{ decoded = atob(raw.replace(/-/g,'+').replace(/_/g,'/')); }catch(e){}
-      if(!decoded){ try{ decoded = decodeURIComponent(raw); }catch(e){} }
-      if(decoded){
-        try{ const obj = JSON.parse(decoded); if(obj) processStartPayload(obj.payload || obj); }catch(e){}
-      }
-      return;
-    }
-    // fallback: direct ad_id param
-    if(qs.ad_id || qs.id){
-      const ad_id = qs.ad_id || qs.id;
-      const payload = { ad_id, secs: qs.secs ? Number(qs.secs) : null, reward: qs.reward ? Number(qs.reward) : null };
-      // if opened via deeplink (outside an iframe) we should use a random timer for validation
-      processStartPayload(payload);
-    }
-  }catch(e){ console.warn('parseQueryStart', e); }
-})();
-
-/* If page opened with no payload — show passive layout (no countdown / claim) */
-(function showPassiveIfNoPayload(){
-  try{
-    const auth = (function(){ try{ return JSON.parse(sessionStorage.getItem(KEY_AUTH)||'null'); }catch(e){return null;} })();
-    const h = (location.hash||'').replace(/^#/,'').trim();
-    const qs = location.search || '';
-    if(!auth && !h && !qs){
-      // show passive ad player layout only (no countdown)
-      el('main').innerHTML = '<div class="small">Public ad player — no validation active.</div>';
-      const adNode = el('adWrap'); adNode.innerHTML = '<div class="small" id="adPlayerStatic">Ad frame — no active validation</div>';
-      // show adslot for crawlers
-      const holder = document.createElement('div'); holder.id = 'adPlayerAdsenseHolder'; holder.style.marginTop='12px'; holder.style.textAlign='center';
-      holder.innerHTML = `<ins class="adsbygoogle" style="display:inline-block;width:468px;height:60px" data-ad-client="${ADSENSE_CLIENT}" data-ad-slot="4194843603"></ins>`;
-      el('main').appendChild(holder);
-      try{ (adsbygoogle = window.adsbygoogle || []).push({}); }catch(e){}
-    }
-  }catch(e){ console.warn('showPassiveIfNoPayload', e); }
-})();
-
-/* small convenience: Back button */
-el('backBtn').addEventListener('click', ()=> {
-  try{ postParent({ type:'request_close_from_hosted', payload: { ts: Date.now() } }); }catch(e){}
-  try{ if(window.close) window.close(); }catch(e){}
+/* === listen from gain.web === */
+window.addEventListener('message',e=>{
+  const d=e.data||{};
+  if(d.type==='_GG_START_PAYLOAD'){handlePayload(d.payload);}
+  if(d.type==='_GG_PING'){post({type:'_GG_PONG',time:Date.now()});}
 });
 
-/* expose some helpers for console debugging (kept minimal and safe) */
-window.__hosted_process = processStartPayload;
-window.__hosted_clear = clearStartPayload;
+/* === restore if payload exists === */
+window.addEventListener('load',()=>{
+  announceReady();
+  const st=sessionStorage.getItem('GG_ACTIVE_PAYLOAD');
+  if(st){try{handlePayload(JSON.parse(st));}catch{}}
+});
+
+/* === close === */
+document.getElementById('closeBtn').onclick=()=>{post({type:'_GG_CLOSE'});window.close&&window.close();};
 </script>
 </body>
 </html>
