@@ -34,7 +34,7 @@
 
   /* small progress bar + animation */
   .progress-wrap{width:100%;height:10px;background:rgba(255,255,255,0.06);border-radius:999px;overflow:hidden;margin-top:10px}
-  .progress-fill{height:100%;width:0%;background:linear-gradient(90deg,#7b2cbf,#ff2d95,#ff6b9d);transition:width 0.15s linear}
+  .progress-fill{height:100%;width:0%;background:linear-gradient(90deg,#7b2cbf,#ff2d95,#ff6b9d);transition:width 0.3s linear}
 
   /* processing pulse */
   .processing {
@@ -182,9 +182,6 @@ function decodeBase64UrlSafe(raw){
 function tryDecodePayloadString(raw){
   if(!raw) return null;
   try{
-    // try base64 first (this handles your bot's safeBase64Encode)
-    const maybeBase64 = decodeBase64UrlSafe(raw);
-    if(maybeBase64 && typeof maybeBase64 === 'object') return maybeBase64;
     // url-encoded JSON
     if(raw.indexOf('%7B') === 0 || raw.indexOf('%5B') === 0 || raw.indexOf('%22') !== -1){
       try { return JSON.parse(decodeURIComponent(raw)); } catch(e){}
@@ -193,13 +190,15 @@ function tryDecodePayloadString(raw){
     if(raw[0] === '{' || raw[0] === '['){
       try { return JSON.parse(raw); } catch(e){}
     }
-    // lastly try decodeURIComponent then parse
+    // try base64
+    const maybe = decodeBase64UrlSafe(raw);
+    if(maybe) return maybe;
     try{ return JSON.parse(decodeURIComponent(raw)); }catch(e){}
   }catch(e){}
   return null;
 }
 
-/* ===== ad provider injection helpers (kept) ===== */
+/* ===== ad provider injection helpers ===== */
 async function injectAdsense(holder){
   try{
     holder.innerHTML = '';
@@ -304,6 +303,8 @@ function startCountdownAndReport(authoritativePayload){
         el('claimBtn').disabled = false;
         el('note').textContent = 'Countdown finished — press Claim to send result.';
         el('procWrap').style.display = 'none';
+        // auto-enable claim (but do not auto-send)
+        // also attach an auto-fallback post after small grace if user doesn't press (optional: we still require claim user action)
       }
     }, 250);
 
@@ -328,8 +329,9 @@ function startCountdownAndReport(authoritativePayload){
             // wait 800-1200ms then close
             setTimeout(()=> tryClose(), 1000);
           } else {
-            el('note').textContent = 'Post failed (will still close after short delay).';
-            setTimeout(()=> tryClose(), 2000);
+            el('note').textContent = 'Posted failed (retrying)...';
+            // still attempt close after small delay to avoid leaving user stuck, but keep visible
+            setTimeout(()=> tryClose(), 2500);
           }
         });
       }catch(e){ console.warn('claim click err', e); dbg('claim err'); }
@@ -403,12 +405,7 @@ function boot(){
         const parts = h.split('?'); const path = parts[0].replace(/^\//,'');
         const hashQP = {};
         if(parts[1]) parts[1].split('&').forEach(p=>{ const i=p.indexOf('='); if(i>=0) hashQP[decodeURIComponent(p.slice(0,i))]=decodeURIComponent(p.slice(i+1)); else hashQP[decodeURIComponent(p)]= ''; });
-        if(path === 'ad' && (hashQP.ad_id || hashQP.id || hashQP.start)){
-          // if start present (base64) decode it; else assemble payload from params
-          if(hashQP.start){
-            const dec = tryDecodePayloadString(hashQP.start);
-            if(dec && typeof dec === 'object'){ el('note').textContent='Hash start payload received.'; startCountdownAndReport(dec); return; }
-          }
+        if(path === 'ad' && (hashQP.ad_id || hashQP.id)){
           const payload = { ad_id: hashQP.ad_id || hashQP.id, secs: hashQP.secs || hashQP.duration, reward: hashQP.reward || hashQP.base, user: { user_id: hashQP.user_id || hashQP.uid || null } };
           el('note').textContent = 'Hash path payload received.';
           startCountdownAndReport(payload);
