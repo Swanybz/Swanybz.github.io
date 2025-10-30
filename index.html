@@ -100,7 +100,7 @@
 /* =========================
   Hosted HTML — dual-mode:
   - PUBLIC: show ad area only (AdSense -> custom provider iframe -> Adsterra -> fallback video)
-  - DEEPLINK/HASH: authoritative payload, show countdown & claim, send results to BOT_WEBHOOK
+  - DEEPLINK/HASH/POSTMESSAGE: authoritative payload, show countdown & claim, send results to BOT_WEBHOOK
   ========================= */
 
 /* ===== CONFIG (edit only if needed) ===== */
@@ -108,13 +108,11 @@ const BOT_WEBHOOK = "https://gaingrid.bots.business/onWebhook"; // onWebhook rec
 const HOSTED_SESSION_KEY = 'gg_hosted_authoritative_payload';
 const ADSTER_SCRIPT_KEY = 'a8702b8b4c48420a3815542007f1c0df';
 const ADSTER_SCRIPT_SRC = "//www.highperformanceformat.com/" + ADSTER_SCRIPT_KEY + "/invoke.js";
-
-// your custom provider URL (as provided)
 const CUSTOM_PROVIDER_URL = "https://experiencedbat.com/dbm/F.zudZGMN/vBZ_GeUM/Jelm/9ruAZ/UjlGkpPiTuYT2/ORDok/w/NEjDU-t/Ntj/Y/4_OhTuAb2iNQixZWs/aKWn1rpydHDr0IxU";
 
 /* ===== utilities (kept names) ===== */
 const el = id => document.getElementById(id);
-function dbg(msg){ try{ el('dbg').style.display='block'; el('dbg').textContent = String(msg).slice(0,120); console.log('hosted:', msg); }catch(e){} }
+function dbg(msg){ try{ el('dbg').style.display='block'; el('dbg').textContent = String(msg).slice(0,140); console.log('hosted:', msg); }catch(e){} }
 function nowISO(){ return (new Date()).toISOString(); }
 function randChoice(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 function safeParse(s){ try{ return JSON.parse(s); }catch(e){ return null; } }
@@ -134,7 +132,7 @@ function tryDecodePayloadString(raw){
   if(!raw) return null;
   try{
     // url-encoded JSON
-    if(raw.indexOf('%7B') === 0 || raw.indexOf('%5B') === 0 || raw.indexOf('%22') !== -1){
+    if((raw.indexOf('%7B') === 0 || raw.indexOf('%5B') === 0) || raw.indexOf('%22') !== -1){
       try { return JSON.parse(decodeURIComponent(raw)); } catch(e){}
     }
     // raw JSON
@@ -206,11 +204,19 @@ function showFallbackVideo(holder){
 
 /* ===== core: start countdown & POST to webhook (deeplink mode only) ===== */
 let countdownTimer = null;
-function startCountdownAndReport(authoritativePayload){
+let sessionActive = false;
+let sessionCompleted = false;
+let sessionPayload = null;
+
+function startCountdownAndReport(authoritativePayload, source = 'deeplink'){
   try{
     if(!authoritativePayload || typeof authoritativePayload !== 'object') return;
     // store authoritative copy
     try{ sessionStorage.setItem(HOSTED_SESSION_KEY, JSON.stringify(authoritativePayload)); }catch(e){}
+    sessionActive = true;
+    sessionCompleted = false;
+    sessionPayload = authoritativePayload;
+
     // determine secs
     const DURS = [30,40,50,60];
     const secs = Number(authoritativePayload.secs) || randChoice(DURS);
@@ -219,14 +225,19 @@ function startCountdownAndReport(authoritativePayload){
 
     // show controls
     el('controls').classList.remove('hidden');
+    el('gaingrid-adsense-landing').style.display = 'none';
     el('note').textContent = `Ad: ${ad_id} — running ${secs}s`;
     el('countdown').textContent = secs;
     el('claimBtn').disabled = true;
 
+    // show VIP if present
+    try{ if(authoritativePayload.vip_level) el('vipInfo').textContent = 'VIP: ' + authoritativePayload.vip_level; }catch(e){}
+
     // ensure ad provider visible (prefer AdSense -> custom -> adsterra -> video)
     (async ()=>{
       const holder = el('adPlayer');
-      let ok = await injectAdsense(holder);
+      let ok = false;
+      try { ok = await injectAdsense(holder); } catch(e) { ok = false; }
       if(!ok) ok = injectCustomProvider(holder);
       if(!ok) ok = injectAdsterra(holder);
       if(!ok) showFallbackVideo(holder);
@@ -240,6 +251,9 @@ function startCountdownAndReport(authoritativePayload){
       el('countdown').textContent = remaining;
       if(remaining <= 0){
         clearInterval(countdownTimer);
+        countdownTimer = null;
+        sessionCompleted = true;
+        sessionActive = false;
         el('claimBtn').disabled = false;
         el('note').textContent = 'Countdown finished — result posted to webhook.';
         // prepare result payload
@@ -253,13 +267,18 @@ function startCountdownAndReport(authoritativePayload){
           ts: nowISO(),
           original_payload: authoritativePayload
         };
+        // send automatically
         sendToWebhook(result);
       }
     }, 1000);
 
     // manual claim
     el('claimBtn').onclick = function(){
+      // manual claim allowed after countdown
+      if(el('claimBtn').disabled) return;
       el('claimBtn').disabled = true;
+      sessionCompleted = true;
+      sessionActive = false;
       const result = {
         ad_id: ad_id,
         reward: reward,
@@ -292,11 +311,56 @@ function sendToWebhook(data){
       fetch(BOT_WEBHOOK, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: body, keepalive:true })
         .then(()=>{}).catch(()=>{});
     }
-    dbg('webhook sent');
+    dbg('webhook sent: ' + (data.status||''));
     el('note').textContent = 'Result posted to webhook.';
-    // do not close the page automatically (gain.web or bot will close the iframe if needed)
+    // leave page open — parent can close iframe if desired
   }catch(e){ console.warn('sendToWebhook err', e); dbg('webhook err'); el('note').textContent = 'Failed to post result'; }
 }
+
+/* ===== skip/abort detection: alert webhook if user navigates/close early ===== */
+function finalizeAsSkippedIfActive(reason){
+  try{
+    if(!sessionActive || sessionCompleted) return;
+    sessionActive = false;
+    sessionCompleted = false;
+    // prepare skipped payload
+    const ad_id = sessionPayload && (sessionPayload.ad_id || sessionPayload.id) ? (sessionPayload.ad_id || sessionPayload.id) : ('host_ad_' + Date.now());
+    const reward = sessionPayload && (sessionPayload.reward || sessionPayload.base) ? (sessionPayload.reward || sessionPayload.base) : 0;
+    const result = {
+      ad_id: ad_id,
+      reward: reward,
+      base: sessionPayload && sessionPayload.base || 0,
+      vip_level: sessionPayload && (sessionPayload.vip_level || sessionPayload.vip) || null,
+      user: sessionPayload && (sessionPayload.user || sessionPayload.user_id) || null,
+      status: 'skipped',
+      reason: reason || 'user_navigated_or_closed',
+      ts: nowISO(),
+      original_payload: sessionPayload || null
+    };
+    sendToWebhook(result);
+  }catch(e){ console.warn('finalizeAsSkippedIfActive err', e); }
+}
+
+// beforeunload: try to inform parent/bot that user skipped if countdown still running
+window.addEventListener('beforeunload', function(ev){
+  try{
+    finalizeAsSkippedIfActive('beforeunload');
+  }catch(e){}
+});
+
+// visibilitychange: if tab becomes hidden and session active for a short time, attempt to mark skipped
+document.addEventListener('visibilitychange', function(){
+  try{
+    if(document.visibilityState === 'hidden'){
+      // schedule a short delay — host might just be switching focus
+      setTimeout(()=> {
+        if(document.visibilityState === 'hidden'){
+          finalizeAsSkippedIfActive('visibility_hidden');
+        }
+      }, 1200);
+    }
+  }catch(e){}
+});
 
 /* ===== decode incoming payloads (query start / hash / hash path) ===== */
 function getQueryParams(){
@@ -304,6 +368,34 @@ function getQueryParams(){
   return s.split('&').filter(Boolean).map(p=>{ const i=p.indexOf('='); if(i<0) return [decodeURIComponent(p),'']; return [decodeURIComponent(p.slice(0,i)), decodeURIComponent(p.slice(i+1))]; }).reduce((o,[k,v])=>{ o[k]=v; return o; }, {});
 }
 
+/* ===== postMessage listener so parent iframe can send authoritative payload directly ===== */
+window.addEventListener('message', function(ev){
+  try{
+    // Accept messages from any origin (gain.web may use different origin) — do not block for now
+    const d = ev.data || {};
+    if(!d || typeof d !== 'object') return;
+    // expected: { type: 'start_payload', payload: { ... } }
+    if(d.type === 'start_payload' && d.payload){
+      const payload = d.payload;
+      // Accept if object or string (string may be base64/json)
+      let obj = null;
+      if(typeof payload === 'string') obj = tryDecodePayloadString(payload);
+      else obj = payload;
+      if(obj && typeof obj === 'object'){
+        el('note').textContent = 'PostMessage payload received.';
+        startCountdownAndReport(obj, 'postmessage');
+      }
+      return;
+    }
+    // optional: handle hosted commands
+    if(d.type === 'close_hosted'){
+      try{ window.close(); }catch(e){}
+      return;
+    }
+  }catch(e){ console.warn('message handler err', e); }
+}, false);
+
+/* ===== boot: check query/hash then public mode ===== */
 function boot(){
   try{
     // 1) query ?start=
@@ -318,21 +410,27 @@ function boot(){
     }
 
     // 2) hash-based
-    const h = (location.hash || '').replace(/^#/,'');
-    if(h){
+    const hraw = (location.hash || '').replace(/^#/,'');
+    if(hraw){
       // path-like: #/ad?ad_id=...
-      if(h.startsWith('/')){
-        const parts = h.split('?'); const path = parts[0].replace(/^\//,'');
+      if(hraw.startsWith('/')){
+        const parts = hraw.split('?'); const path = parts[0].replace(/^\//,'');
         const hashQP = {};
         if(parts[1]) parts[1].split('&').forEach(p=>{ const i=p.indexOf('='); if(i>=0) hashQP[decodeURIComponent(p.slice(0,i))]=decodeURIComponent(p.slice(i+1)); else hashQP[decodeURIComponent(p)]= ''; });
-        if(path === 'ad' && (hashQP.ad_id || hashQP.id)){
+        if(path === 'ad' && (hashQP.ad_id || hashQP.id || hashQP.start)){
+          // if start param exists and is base64/json use it
+          if(hashQP.start){
+            const dec = tryDecodePayloadString(hashQP.start);
+            if(dec && typeof dec === 'object'){ el('note').textContent = 'Hash path payload (start) received.'; startCountdownAndReport(dec); return; }
+          }
           const payload = { ad_id: hashQP.ad_id || hashQP.id, secs: hashQP.secs || hashQP.duration, reward: hashQP.reward || hashQP.base, user: { user_id: hashQP.user_id || hashQP.uid || null } };
           el('note').textContent = 'Hash path payload received.';
           startCountdownAndReport(payload);
           return;
         }
       } else {
-        const decoded = tryDecodePayloadString(decodeURIComponent(h));
+        // pure hash could be base64 or urlencoded JSON
+        const decoded = tryDecodePayloadString(decodeURIComponent(hraw));
         if(decoded && typeof decoded === 'object'){
           el('note').textContent = 'Hash base64 payload received.';
           startCountdownAndReport(decoded);
@@ -341,13 +439,27 @@ function boot(){
       }
     }
 
+    // 3) sessionStorage fallback
+    try{
+      const sess = sessionStorage.getItem(HOSTED_SESSION_KEY);
+      if(sess){
+        const obj = safeParse(sess);
+        if(obj && typeof obj === 'object'){
+          // if session exists but no active countdown, we still can resume UI in completed/idle state
+          el('note').textContent = 'Resumed session (no active countdown).';
+          // do not auto-start if not authoritative now — leave as public mode
+        }
+      }
+    }catch(e){}
+
     // no authoritative payload => PUBLIC MODE
     el('note').textContent = 'Public mode — ad area (no controls).';
     el('controls').classList.add('hidden');
     // show ad area: prefer AdSense -> custom provider -> Adsterra -> fallback video
     (async ()=>{
       const holder = el('adPlayer');
-      let ok = await injectAdsense(holder);
+      let ok = false;
+      try { ok = await injectAdsense(holder); } catch(e) { ok = false; }
       if(!ok) ok = injectCustomProvider(holder);
       if(!ok) ok = injectAdsterra(holder);
       if(!ok) showFallbackVideo(holder);
