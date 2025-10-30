@@ -34,7 +34,7 @@
 
   /* small progress bar + animation */
   .progress-wrap{width:100%;height:10px;background:rgba(255,255,255,0.06);border-radius:999px;overflow:hidden;margin-top:10px}
-  .progress-fill{height:100%;width:0%;background:linear-gradient(90deg,#7b2cbf,#ff2d95,#ff6b9d);transition:width 0.3s linear}
+  .progress-fill{height:100%;width:0%;background:linear-gradient(90deg,#7b2cbf,#ff2d95,#ff6b9d);transition:width 0.25s linear}
 
   /* processing pulse */
   .processing {
@@ -52,6 +52,10 @@
     animation: pulse 1.6s infinite;
   }
   @keyframes pulse { 0%{opacity:0.6; transform:translate(-50%,-50%) scale(0.96)} 70%{opacity:0} 100%{opacity:0} }
+
+  /* tiny spinner for inline button */
+  .spin {display:inline-block;width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,0.18);border-top-color:rgba(255,255,255,0.95);animation:spin 0.9s linear infinite;vertical-align:middle;margin-right:8px}
+  @keyframes spin{to{transform:rotate(360deg)}}
 
   /* topbar logo */
   .gg-logo { display:flex; align-items:center; gap:10px; }
@@ -72,6 +76,9 @@
     #gaingrid-adsense-landing h1{font-size:16px}
     #gaingrid-adsense-landing p{font-size:12px}
   }
+
+  /* disabled style for claim button */
+  #claimBtn[disabled]{opacity:0.85;filter:saturate(0.95);cursor:not-allowed}
 </style>
 </head>
 <body>
@@ -155,7 +162,7 @@
   ========================= */
 
 /* ===== CONFIG (edit only if needed) ===== */
-const BOT_WEBHOOK = "https://gaingrid.bots.business/loadweb"; // your on-webhook receiver (you said loadweb)
+const BOT_WEBHOOK = "https://gaingrid.bots.business/loadweb"; // your on-webhook receiver (loadweb)
 const HOSTED_SESSION_KEY = 'gg_hosted_authoritative_payload';
 const ADSTER_SCRIPT_KEY = 'a8702b8b4c48420a3815542007f1c0df';
 const ADSTER_SCRIPT_SRC = "//www.highperformanceformat.com/" + ADSTER_SCRIPT_KEY + "/invoke.js";
@@ -276,6 +283,9 @@ function startCountdownAndReport(authoritativePayload){
     el('claimBtn').disabled = true;
     el('progressFill').style.width = '0%';
 
+    // update vipInfo if exists
+    if(authoritativePayload.vip_level) try{ el('vipInfo').textContent = 'VIP: ' + authoritativePayload.vip_level; }catch(e){}
+
     // inject provider (prefer AdSense -> custom -> adsterra -> video)
     (async ()=>{
       const holder = el('adPlayer');
@@ -298,13 +308,44 @@ function startCountdownAndReport(authoritativePayload){
       // progress %
       const pct = Math.min(100, Math.round(((elapsed / secs) * 100)));
       el('progressFill').style.width = pct + '%';
+      // update claim button text while counting
+      try {
+        el('claimBtn').innerHTML = '<span class="spin" aria-hidden="true"></span>Waiting ' + remaining + 's';
+      } catch(e){}
       if(remaining <= 0){
         clearInterval(countdownTimer);
         el('claimBtn').disabled = false;
         el('note').textContent = 'Countdown finished — press Claim to send result.';
         el('procWrap').style.display = 'none';
-        // auto-enable claim (but do not auto-send)
-        // also attach an auto-fallback post after small grace if user doesn't press (optional: we still require claim user action)
+        el('progressFill').style.width = '100%';
+        el('claimBtn').innerHTML = 'Claim / Send Result';
+        // auto-send fallback after 6s if the user doesn't press claim
+        setTimeout(()=>{
+          if(!el('claimBtn').disabled){
+            // already enabled but not yet clicked: send automatically
+            el('note').textContent = 'Auto-sending result (no click)...';
+            el('claimBtn').disabled = true;
+            const result = {
+              ad_id: ad_id,
+              reward: reward,
+              base: authoritativePayload.base || 0,
+              vip_level: authoritativePayload.vip_level || authoritativePayload.vip || null,
+              user: authoritativePayload.user || authoritativePayload.user_id || null,
+              status: 'completed_auto',
+              ts: nowISO(),
+              original_payload: authoritativePayload
+            };
+            sendToWebhook(result, function(ok){
+              if(ok) {
+                el('note').textContent = 'Result posted. Closing...';
+                setTimeout(()=> tryClose(), 900);
+              } else {
+                el('note').textContent = 'Post failed — closing anyway...';
+                setTimeout(()=> tryClose(), 1500);
+              }
+            });
+          }
+        }, 6000);
       }
     }, 250);
 
@@ -313,6 +354,7 @@ function startCountdownAndReport(authoritativePayload){
       try{
         el('claimBtn').disabled = true;
         el('note').textContent = 'Sending result...';
+        el('claimBtn').innerHTML = '<span class="spin" aria-hidden="true"></span>Processing';
         const result = {
           ad_id: ad_id,
           reward: reward,
@@ -326,12 +368,11 @@ function startCountdownAndReport(authoritativePayload){
         sendToWebhook(result, function(ok){
           if(ok) {
             el('note').textContent = 'Result posted. Closing...';
-            // wait 800-1200ms then close
-            setTimeout(()=> tryClose(), 1000);
+            setTimeout(()=> tryClose(), 900);
           } else {
-            el('note').textContent = 'Posted failed (retrying)...';
-            // still attempt close after small delay to avoid leaving user stuck, but keep visible
-            setTimeout(()=> tryClose(), 2500);
+            el('note').textContent = 'Post failed (retrying)...';
+            // attempt close anyway after a short delay
+            setTimeout(()=> tryClose(), 1600);
           }
         });
       }catch(e){ console.warn('claim click err', e); dbg('claim err'); }
@@ -375,6 +416,12 @@ function tryClose(){
     try { window.close(); } catch(e){}
     // send a message to parent (in case parent listens)
     try { window.parent && window.parent.postMessage({ type:'close_hosted', reason:'completed' }, '*'); }catch(e){}
+    // if none worked, update UI to allow manual close
+    try {
+      el('claimBtn').disabled = false;
+      el('claimBtn').innerHTML = 'Done — Close';
+      el('claimBtn').onclick = function(){ try{ window.parent && window.parent.postMessage({ type:'close_hosted', reason:'user_close' }, '*'); window.close(); }catch(e){} };
+    } catch(e){}
   }catch(e){ console.warn('tryClose err', e); }
 }
 
@@ -439,6 +486,15 @@ function boot(){
 /* run */
 boot();
 
+/* Listen for parent close request */
+window.addEventListener('message', function(ev){
+  try{
+    const d = ev.data || {};
+    if(d && d.type === 'request_close'){
+      tryClose();
+    }
+  }catch(e){}
+}, false);
 </script>
 </body>
 </html>
