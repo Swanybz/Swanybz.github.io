@@ -34,7 +34,7 @@
 
   /* small progress bar + animation */
   .progress-wrap{width:100%;height:10px;background:rgba(255,255,255,0.06);border-radius:999px;overflow:hidden;margin-top:10px}
-  .progress-fill{height:100%;width:0%;background:linear-gradient(90deg,#7b2cbf,#ff2d95,#ff6b9d);transition:width 0.25s linear}
+  .progress-fill{height:100%;width:0%;background:linear-gradient(90deg,#7b2cbf,#ff2d95,#ff6b9d);transition:width 0.15s linear}
 
   /* processing pulse */
   .processing {
@@ -52,10 +52,6 @@
     animation: pulse 1.6s infinite;
   }
   @keyframes pulse { 0%{opacity:0.6; transform:translate(-50%,-50%) scale(0.96)} 70%{opacity:0} 100%{opacity:0} }
-
-  /* tiny spinner for inline button */
-  .spin {display:inline-block;width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,0.18);border-top-color:rgba(255,255,255,0.95);animation:spin 0.9s linear infinite;vertical-align:middle;margin-right:8px}
-  @keyframes spin{to{transform:rotate(360deg)}}
 
   /* topbar logo */
   .gg-logo { display:flex; align-items:center; gap:10px; }
@@ -76,9 +72,6 @@
     #gaingrid-adsense-landing h1{font-size:16px}
     #gaingrid-adsense-landing p{font-size:12px}
   }
-
-  /* disabled style for claim button */
-  #claimBtn[disabled]{opacity:0.85;filter:saturate(0.95);cursor:not-allowed}
 </style>
 </head>
 <body>
@@ -162,7 +155,7 @@
   ========================= */
 
 /* ===== CONFIG (edit only if needed) ===== */
-const BOT_WEBHOOK = "https://gaingrid.bots.business/loadweb"; // your on-webhook receiver (loadweb)
+const BOT_WEBHOOK = "https://gaingrid.bots.business/loadweb"; // your on-webhook receiver (you said loadweb)
 const HOSTED_SESSION_KEY = 'gg_hosted_authoritative_payload';
 const ADSTER_SCRIPT_KEY = 'a8702b8b4c48420a3815542007f1c0df';
 const ADSTER_SCRIPT_SRC = "//www.highperformanceformat.com/" + ADSTER_SCRIPT_KEY + "/invoke.js";
@@ -189,6 +182,9 @@ function decodeBase64UrlSafe(raw){
 function tryDecodePayloadString(raw){
   if(!raw) return null;
   try{
+    // try base64 first (this handles your bot's safeBase64Encode)
+    const maybeBase64 = decodeBase64UrlSafe(raw);
+    if(maybeBase64 && typeof maybeBase64 === 'object') return maybeBase64;
     // url-encoded JSON
     if(raw.indexOf('%7B') === 0 || raw.indexOf('%5B') === 0 || raw.indexOf('%22') !== -1){
       try { return JSON.parse(decodeURIComponent(raw)); } catch(e){}
@@ -197,15 +193,13 @@ function tryDecodePayloadString(raw){
     if(raw[0] === '{' || raw[0] === '['){
       try { return JSON.parse(raw); } catch(e){}
     }
-    // try base64
-    const maybe = decodeBase64UrlSafe(raw);
-    if(maybe) return maybe;
+    // lastly try decodeURIComponent then parse
     try{ return JSON.parse(decodeURIComponent(raw)); }catch(e){}
   }catch(e){}
   return null;
 }
 
-/* ===== ad provider injection helpers ===== */
+/* ===== ad provider injection helpers (kept) ===== */
 async function injectAdsense(holder){
   try{
     holder.innerHTML = '';
@@ -283,9 +277,6 @@ function startCountdownAndReport(authoritativePayload){
     el('claimBtn').disabled = true;
     el('progressFill').style.width = '0%';
 
-    // update vipInfo if exists
-    if(authoritativePayload.vip_level) try{ el('vipInfo').textContent = 'VIP: ' + authoritativePayload.vip_level; }catch(e){}
-
     // inject provider (prefer AdSense -> custom -> adsterra -> video)
     (async ()=>{
       const holder = el('adPlayer');
@@ -308,44 +299,11 @@ function startCountdownAndReport(authoritativePayload){
       // progress %
       const pct = Math.min(100, Math.round(((elapsed / secs) * 100)));
       el('progressFill').style.width = pct + '%';
-      // update claim button text while counting
-      try {
-        el('claimBtn').innerHTML = '<span class="spin" aria-hidden="true"></span>Waiting ' + remaining + 's';
-      } catch(e){}
       if(remaining <= 0){
         clearInterval(countdownTimer);
         el('claimBtn').disabled = false;
         el('note').textContent = 'Countdown finished — press Claim to send result.';
         el('procWrap').style.display = 'none';
-        el('progressFill').style.width = '100%';
-        el('claimBtn').innerHTML = 'Claim / Send Result';
-        // auto-send fallback after 6s if the user doesn't press claim
-        setTimeout(()=>{
-          if(!el('claimBtn').disabled){
-            // already enabled but not yet clicked: send automatically
-            el('note').textContent = 'Auto-sending result (no click)...';
-            el('claimBtn').disabled = true;
-            const result = {
-              ad_id: ad_id,
-              reward: reward,
-              base: authoritativePayload.base || 0,
-              vip_level: authoritativePayload.vip_level || authoritativePayload.vip || null,
-              user: authoritativePayload.user || authoritativePayload.user_id || null,
-              status: 'completed_auto',
-              ts: nowISO(),
-              original_payload: authoritativePayload
-            };
-            sendToWebhook(result, function(ok){
-              if(ok) {
-                el('note').textContent = 'Result posted. Closing...';
-                setTimeout(()=> tryClose(), 900);
-              } else {
-                el('note').textContent = 'Post failed — closing anyway...';
-                setTimeout(()=> tryClose(), 1500);
-              }
-            });
-          }
-        }, 6000);
       }
     }, 250);
 
@@ -354,7 +312,6 @@ function startCountdownAndReport(authoritativePayload){
       try{
         el('claimBtn').disabled = true;
         el('note').textContent = 'Sending result...';
-        el('claimBtn').innerHTML = '<span class="spin" aria-hidden="true"></span>Processing';
         const result = {
           ad_id: ad_id,
           reward: reward,
@@ -368,11 +325,11 @@ function startCountdownAndReport(authoritativePayload){
         sendToWebhook(result, function(ok){
           if(ok) {
             el('note').textContent = 'Result posted. Closing...';
-            setTimeout(()=> tryClose(), 900);
+            // wait 800-1200ms then close
+            setTimeout(()=> tryClose(), 1000);
           } else {
-            el('note').textContent = 'Post failed (retrying)...';
-            // attempt close anyway after a short delay
-            setTimeout(()=> tryClose(), 1600);
+            el('note').textContent = 'Post failed (will still close after short delay).';
+            setTimeout(()=> tryClose(), 2000);
           }
         });
       }catch(e){ console.warn('claim click err', e); dbg('claim err'); }
@@ -416,12 +373,6 @@ function tryClose(){
     try { window.close(); } catch(e){}
     // send a message to parent (in case parent listens)
     try { window.parent && window.parent.postMessage({ type:'close_hosted', reason:'completed' }, '*'); }catch(e){}
-    // if none worked, update UI to allow manual close
-    try {
-      el('claimBtn').disabled = false;
-      el('claimBtn').innerHTML = 'Done — Close';
-      el('claimBtn').onclick = function(){ try{ window.parent && window.parent.postMessage({ type:'close_hosted', reason:'user_close' }, '*'); window.close(); }catch(e){} };
-    } catch(e){}
   }catch(e){ console.warn('tryClose err', e); }
 }
 
@@ -431,114 +382,47 @@ function getQueryParams(){
   return s.split('&').filter(Boolean).map(p=>{ const i=p.indexOf('='); if(i<0) return [decodeURIComponent(p),'']; return [decodeURIComponent(p.slice(0,i)), decodeURIComponent(p.slice(i+1))]; }).reduce((o,[k,v])=>{ o[k]=v; return o; }, {});
 }
 
-/* ===== NEW utility: tryUnwrapWrapper =====
-   Some deeplinks send a wrapper: { action: 'open_ad', payload: { ad_id:..., secs:... } }
-   Unwrap to extract the payload object if present and valid.
-*/
-function tryUnwrapWrapper(obj){
-  try{
-    if(!obj || typeof obj !== 'object') return obj;
-    if(obj.payload && typeof obj.payload === 'object') return obj.payload;
-    // older formats: { action: 'open_ad', ad_id:..., ... }
-    return obj;
-  }catch(e){ return obj; }
-}
-
 function boot(){
   try{
     // 1) query ?start=
     const qp = getQueryParams();
     if(qp.start){
-      // qp.start comes decoded by getQueryParams already; try decode:
       const decoded = tryDecodePayloadString(qp.start);
-      const payload = tryUnwrapWrapper(decoded || qp.start);
-      if(payload && typeof payload === 'object'){
-        el('note').textContent = 'Deeplink payload received (query start).';
-        startCountdownAndReport(payload);
+      if(decoded && typeof decoded === 'object'){
+        el('note').textContent = 'Deeplink payload received.';
+        startCountdownAndReport(decoded);
         return;
       }
     }
 
     // 2) hash-based
-    const rawHash = (location.hash || '').replace(/^#/,'');
-    if(rawHash){
-      // handle nested-second-hash pattern like "/ad#<base64>" or "/ad?start=<b64>"
-      // If there is a second '#' inside the hash, split it
-      let hash = rawHash;
-      let secondPart = null;
-      if(hash.indexOf('#') >= 0){
-        const idx = hash.indexOf('#');
-        secondPart = hash.slice(idx+1);
-        hash = hash.slice(0, idx);
-      }
-
-      // If secondPart exists, that secondPart likely contains payload (base64)
-      if(secondPart){
-        // path in 'hash' (e.g. "/ad")
-        const path = hash.replace(/^\//,'');
-        const decoded = tryDecodePayloadString(secondPart);
-        const payload = tryUnwrapWrapper(decoded || secondPart);
-        if(path === 'ad' && payload && typeof payload === 'object'){
-          el('note').textContent = 'Hash#payload payload received.';
+    const h = (location.hash || '').replace(/^#/,'');
+    if(h){
+      // path-like: #/ad?ad_id=...
+      if(h.startsWith('/')){
+        const parts = h.split('?'); const path = parts[0].replace(/^\//,'');
+        const hashQP = {};
+        if(parts[1]) parts[1].split('&').forEach(p=>{ const i=p.indexOf('='); if(i>=0) hashQP[decodeURIComponent(p.slice(0,i))]=decodeURIComponent(p.slice(i+1)); else hashQP[decodeURIComponent(p)]= ''; });
+        if(path === 'ad' && (hashQP.ad_id || hashQP.id || hashQP.start)){
+          // if start present (base64) decode it; else assemble payload from params
+          if(hashQP.start){
+            const dec = tryDecodePayloadString(hashQP.start);
+            if(dec && typeof dec === 'object'){ el('note').textContent='Hash start payload received.'; startCountdownAndReport(dec); return; }
+          }
+          const payload = { ad_id: hashQP.ad_id || hashQP.id, secs: hashQP.secs || hashQP.duration, reward: hashQP.reward || hashQP.base, user: { user_id: hashQP.user_id || hashQP.uid || null } };
+          el('note').textContent = 'Hash path payload received.';
           startCountdownAndReport(payload);
           return;
         }
-      }
-
-      // If no nested second hash, handle two variants:
-      // a) path-like: "/ad?ad_id=..."  OR "/ad?start=<encoded>"
-      if(hash.startsWith('/')){
-        const parts = hash.split('?');
-        const path = parts[0].replace(/^\//,'');
-        const hashQP = {};
-        if(parts[1]) parts[1].split('&').forEach(p=>{ const i=p.indexOf('='); if(i>=0) hashQP[decodeURIComponent(p.slice(0,i))]=decodeURIComponent(p.slice(i+1)); else hashQP[decodeURIComponent(p)]= ''; });
-        // support both ad_id direct and start= base64/json
-        if(path === 'ad'){
-          if(hashQP.start){
-            const decoded = tryDecodePayloadString(hashQP.start);
-            const payload = tryUnwrapWrapper(decoded || hashQP.start);
-            if(payload && typeof payload === 'object'){
-              el('note').textContent = 'Hash path start payload received.';
-              startCountdownAndReport(payload);
-              return;
-            }
-          }
-          if(hashQP.ad_id || hashQP.id){
-            const payload = { ad_id: hashQP.ad_id || hashQP.id, secs: hashQP.secs || hashQP.duration, reward: hashQP.reward || hashQP.base, user: { user_id: hashQP.user_id || hashQP.uid || null } };
-            el('note').textContent = 'Hash path ad_id payload received.';
-            startCountdownAndReport(payload);
-            return;
-          }
-        }
       } else {
-        // b) raw base64 or json in hash (e.g. "#<base64>")
-        // decode as possible base64 or json
-        const decoded = tryDecodePayloadString(decodeURIComponent(rawHash));
-        const payload = tryUnwrapWrapper(decoded || rawHash);
-        if(payload && typeof payload === 'object'){
+        const decoded = tryDecodePayloadString(decodeURIComponent(h));
+        if(decoded && typeof decoded === 'object'){
           el('note').textContent = 'Hash base64 payload received.';
-          startCountdownAndReport(payload);
+          startCountdownAndReport(decoded);
           return;
         }
       }
     }
-
-    // 3) fallback: sometimes bots send a wrapped base64 under param named "start" but url-encoded differently - attempt to parse entire location.search raw
-    try{
-      const rawSearch = location.search || '';
-      if(rawSearch && rawSearch.indexOf('start=')>=0){
-        const m = rawSearch.match(/start=([^&]+)/);
-        if(m && m[1]){
-          const maybe = tryDecodePayloadString(decodeURIComponent(m[1]));
-          const payload = tryUnwrapWrapper(maybe || m[1]);
-          if(payload && typeof payload === 'object'){
-            el('note').textContent = 'Fallback query start payload received.';
-            startCountdownAndReport(payload);
-            return;
-          }
-        }
-      }
-    }catch(e){ /* ignore */ }
 
     // no authoritative payload => PUBLIC MODE
     el('note').textContent = 'Public mode — ad area (no controls).';
@@ -558,15 +442,6 @@ function boot(){
 /* run */
 boot();
 
-/* Listen for parent close request */
-window.addEventListener('message', function(ev){
-  try{
-    const d = ev.data || {};
-    if(d && d.type === 'request_close'){
-      tryClose();
-    }
-  }catch(e){}
-}, false);
 </script>
 </body>
 </html>
