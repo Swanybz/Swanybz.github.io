@@ -431,42 +431,114 @@ function getQueryParams(){
   return s.split('&').filter(Boolean).map(p=>{ const i=p.indexOf('='); if(i<0) return [decodeURIComponent(p),'']; return [decodeURIComponent(p.slice(0,i)), decodeURIComponent(p.slice(i+1))]; }).reduce((o,[k,v])=>{ o[k]=v; return o; }, {});
 }
 
+/* ===== NEW utility: tryUnwrapWrapper =====
+   Some deeplinks send a wrapper: { action: 'open_ad', payload: { ad_id:..., secs:... } }
+   Unwrap to extract the payload object if present and valid.
+*/
+function tryUnwrapWrapper(obj){
+  try{
+    if(!obj || typeof obj !== 'object') return obj;
+    if(obj.payload && typeof obj.payload === 'object') return obj.payload;
+    // older formats: { action: 'open_ad', ad_id:..., ... }
+    return obj;
+  }catch(e){ return obj; }
+}
+
 function boot(){
   try{
     // 1) query ?start=
     const qp = getQueryParams();
     if(qp.start){
+      // qp.start comes decoded by getQueryParams already; try decode:
       const decoded = tryDecodePayloadString(qp.start);
-      if(decoded && typeof decoded === 'object'){
-        el('note').textContent = 'Deeplink payload received.';
-        startCountdownAndReport(decoded);
+      const payload = tryUnwrapWrapper(decoded || qp.start);
+      if(payload && typeof payload === 'object'){
+        el('note').textContent = 'Deeplink payload received (query start).';
+        startCountdownAndReport(payload);
         return;
       }
     }
 
     // 2) hash-based
-    const h = (location.hash || '').replace(/^#/,'');
-    if(h){
-      // path-like: #/ad?ad_id=...
-      if(h.startsWith('/')){
-        const parts = h.split('?'); const path = parts[0].replace(/^\//,'');
-        const hashQP = {};
-        if(parts[1]) parts[1].split('&').forEach(p=>{ const i=p.indexOf('='); if(i>=0) hashQP[decodeURIComponent(p.slice(0,i))]=decodeURIComponent(p.slice(i+1)); else hashQP[decodeURIComponent(p)]= ''; });
-        if(path === 'ad' && (hashQP.ad_id || hashQP.id)){
-          const payload = { ad_id: hashQP.ad_id || hashQP.id, secs: hashQP.secs || hashQP.duration, reward: hashQP.reward || hashQP.base, user: { user_id: hashQP.user_id || hashQP.uid || null } };
-          el('note').textContent = 'Hash path payload received.';
+    const rawHash = (location.hash || '').replace(/^#/,'');
+    if(rawHash){
+      // handle nested-second-hash pattern like "/ad#<base64>" or "/ad?start=<b64>"
+      // If there is a second '#' inside the hash, split it
+      let hash = rawHash;
+      let secondPart = null;
+      if(hash.indexOf('#') >= 0){
+        const idx = hash.indexOf('#');
+        secondPart = hash.slice(idx+1);
+        hash = hash.slice(0, idx);
+      }
+
+      // If secondPart exists, that secondPart likely contains payload (base64)
+      if(secondPart){
+        // path in 'hash' (e.g. "/ad")
+        const path = hash.replace(/^\//,'');
+        const decoded = tryDecodePayloadString(secondPart);
+        const payload = tryUnwrapWrapper(decoded || secondPart);
+        if(path === 'ad' && payload && typeof payload === 'object'){
+          el('note').textContent = 'Hash#payload payload received.';
           startCountdownAndReport(payload);
           return;
         }
+      }
+
+      // If no nested second hash, handle two variants:
+      // a) path-like: "/ad?ad_id=..."  OR "/ad?start=<encoded>"
+      if(hash.startsWith('/')){
+        const parts = hash.split('?');
+        const path = parts[0].replace(/^\//,'');
+        const hashQP = {};
+        if(parts[1]) parts[1].split('&').forEach(p=>{ const i=p.indexOf('='); if(i>=0) hashQP[decodeURIComponent(p.slice(0,i))]=decodeURIComponent(p.slice(i+1)); else hashQP[decodeURIComponent(p)]= ''; });
+        // support both ad_id direct and start= base64/json
+        if(path === 'ad'){
+          if(hashQP.start){
+            const decoded = tryDecodePayloadString(hashQP.start);
+            const payload = tryUnwrapWrapper(decoded || hashQP.start);
+            if(payload && typeof payload === 'object'){
+              el('note').textContent = 'Hash path start payload received.';
+              startCountdownAndReport(payload);
+              return;
+            }
+          }
+          if(hashQP.ad_id || hashQP.id){
+            const payload = { ad_id: hashQP.ad_id || hashQP.id, secs: hashQP.secs || hashQP.duration, reward: hashQP.reward || hashQP.base, user: { user_id: hashQP.user_id || hashQP.uid || null } };
+            el('note').textContent = 'Hash path ad_id payload received.';
+            startCountdownAndReport(payload);
+            return;
+          }
+        }
       } else {
-        const decoded = tryDecodePayloadString(decodeURIComponent(h));
-        if(decoded && typeof decoded === 'object'){
+        // b) raw base64 or json in hash (e.g. "#<base64>")
+        // decode as possible base64 or json
+        const decoded = tryDecodePayloadString(decodeURIComponent(rawHash));
+        const payload = tryUnwrapWrapper(decoded || rawHash);
+        if(payload && typeof payload === 'object'){
           el('note').textContent = 'Hash base64 payload received.';
-          startCountdownAndReport(decoded);
+          startCountdownAndReport(payload);
           return;
         }
       }
     }
+
+    // 3) fallback: sometimes bots send a wrapped base64 under param named "start" but url-encoded differently - attempt to parse entire location.search raw
+    try{
+      const rawSearch = location.search || '';
+      if(rawSearch && rawSearch.indexOf('start=')>=0){
+        const m = rawSearch.match(/start=([^&]+)/);
+        if(m && m[1]){
+          const maybe = tryDecodePayloadString(decodeURIComponent(m[1]));
+          const payload = tryUnwrapWrapper(maybe || m[1]);
+          if(payload && typeof payload === 'object'){
+            el('note').textContent = 'Fallback query start payload received.';
+            startCountdownAndReport(payload);
+            return;
+          }
+        }
+      }
+    }catch(e){ /* ignore */ }
 
     // no authoritative payload => PUBLIC MODE
     el('note').textContent = 'Public mode — ad area (no controls).';
