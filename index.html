@@ -13,7 +13,6 @@
   :root{
     --accent1:#ff6b9d; --accent2:#c471ed;
     --bg:linear-gradient(135deg,#0f1419 0,#1a2332 50%,#0d1117 100%);
-    --logo-gradient: linear-gradient(90deg, rgba(196,113,237,0.16), rgba(255,107,157,0.16), rgba(255,107,157,0.12));
   }
   *,*::before,*::after{box-sizing:border-box}
   html,body{height:100%;margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial;color:#fff;background:var(--bg)}
@@ -24,41 +23,69 @@
   .small{font-size:12px;color:rgba(255,255,255,0.78)}
   .ad-player{width:100%;height:var(--ad-height,360px);border-radius:8px;overflow:hidden;background:#000;display:flex;align-items:center;justify-content:center;position:relative}
   .ad-player iframe, .ad-player video{width:100%;height:100%;border:0;object-fit:cover}
-  .controls{margin-top:12px;display:flex;gap:8px;align-items:center;justify-content:center}
-  .btn{padding:8px 10px;border-radius:8px;background:linear-gradient(45deg,var(--accent1),var(--accent2));border:none;color:#fff;cursor:pointer;font-weight:700}
+  .controls{margin-top:12px;display:flex;gap:16px;align-items:center;justify-content:center}
+  .btn{padding:10px 14px;border-radius:10px;background:linear-gradient(45deg,var(--accent1),var(--accent2));border:none;color:#fff;cursor:pointer;font-weight:800;font-size:14px}
   .btn.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06)}
   .countdown{font-weight:700;font-size:18px;color:#fff}
   .note{margin-top:8px;color:rgba(255,255,255,0.6);font-size:12px;text-align:center}
   .hidden{display:none}
   #dbg{position:absolute;right:10px;bottom:10px;padding:6px 8px;background:rgba(0,0,0,0.6);border-radius:6px;font-size:11px;color:#fff;z-index:50;display:none}
 
-  /* ==== GainGrid logo (dim) ==== */
-  .gg-logo {
-    display:flex; align-items:center; gap:10px;
-    opacity:0.85;
+  /* ==== GainGrid gradient text logo (bold, filled with gradient colors purple-red-pink) ==== */
+  .gg-logo-text {
+    font-weight:900;
+    font-size:18px;
+    letter-spacing:0.4px;
+    background: linear-gradient(90deg, #c471ed 0%, #ff6b9d 45%, #ff4d79 100%);
+    -webkit-background-clip:text;
+    -webkit-text-fill-color:transparent;
+    color: transparent;
+    display:inline-block;
   }
-  .gg-mark {
-    width:34px; height:34px; border-radius:8px;
-    background: linear-gradient(135deg, rgba(196,113,237,0.22), rgba(255,107,157,0.22));
-    display:flex; align-items:center; justify-content:center;
-    box-shadow: 0 6px 18px rgba(196,113,237,0.06);
-    font-weight:800; font-size:12px; color:rgba(255,255,255,0.9);
-    letter-spacing:0.6px;
-  }
-  .gg-title-dim { font-weight:700; font-size:13px; color: rgba(255,255,255,0.85); opacity:0.9; }
-  /* keep it "dim" visually */
-  .gg-sub { font-size:11px; color: rgba(255,255,255,0.65); margin-top:-2px; }
 
-  /* ===== progress/loading bar ===== */
-  .progress-wrap { position:absolute; left:0; right:0; bottom:0; height:6px; background: rgba(255,255,255,0.03); }
-  .progress-bar {
-    height:100%; width:0%; border-radius:0 0 6px 6px;
-    background: linear-gradient(90deg,var(--accent1),var(--accent2));
-    transition: width 0.25s linear;
+  /* ==== Circular loader + progress ring ==== */
+  .circle-wrap { width:88px; height:88px; display:flex;align-items:center;justify-content:center; position:relative; }
+  .loader-spinner { position:absolute; width:48px; height:48px; border-radius:50%; display:flex;align-items:center;justify-content:center; }
+  .spinner-dot { width:8px; height:8px; border-radius:50%; background:rgba(255,255,255,0.9); opacity:0.12; animation:spinner 900ms linear infinite; }
+  .spinner-dot:nth-child(2){ animation-delay:120ms; opacity:0.22 }
+  .spinner-dot:nth-child(3){ animation-delay:240ms; opacity:0.32 }
+  @keyframes spinner { 0%{ transform: translateY(-8px); }50%{ transform: translateY(0px); }100%{ transform: translateY(-8px); } }
+
+  .progress-ring { width:88px; height:88px; transform: rotate(-90deg); }
+  .ring-svg { width:100%; height:100%; }
+  .ring-circle-bg { stroke: rgba(255,255,255,0.06); stroke-width:8; fill:none; }
+  .ring-circle { stroke-linecap: round; stroke-width:8; fill:none; stroke: url(#ringGradient); transition: stroke-dashoffset 0.25s linear; }
+
+  .circle-number {
+    position:absolute; font-weight:800; font-size:20px; pointer-events:none; color:#fff;
+    text-shadow:0 1px 0 rgba(0,0,0,0.6);
   }
+
+  /* fade-out animation for the circle when finished */
+  .circle-fadeout { animation:circleOut 380ms ease forwards; }
+  @keyframes circleOut { to { transform: scale(0.85); opacity:0; } }
+
+  /* claim button pop/pulse/vibrate */
+  .btn-pop {
+    transform-origin:center;
+    animation:popIn 420ms cubic-bezier(.2,.9,.3,1) forwards;
+  }
+  @keyframes popIn {
+    0% { transform: scale(0.6); opacity:0 }
+    60% { transform: scale(1.08); opacity:1 }
+    100% { transform: scale(1); }
+  }
+  @keyframes pulse {
+    0% { transform: translateY(0) }
+    50% { transform: translateY(-4px) }
+    100% { transform: translateY(0) }
+  }
+  .btn-pulse { animation: pulse 900ms ease-in-out infinite; }
+
+  /* progress small text */
   .progress-text { position:absolute; left:12px; bottom:10px; font-size:11px; color:rgba(255,255,255,0.9); text-shadow:0 1px 0 rgba(0,0,0,0.6); }
 
-  /* ===== Scoped AdSense landing styles (won't override existing rules) ===== */
+  /* scoped landing styles (kept) */
   #gaingrid-adsense-landing{background:rgba(255,255,255,0.02);border-radius:8px;padding:12px;margin-bottom:10px;color:#fff}
   #gaingrid-adsense-landing h1{margin:0 0 6px;font-size:18px;line-height:1.05}
   #gaingrid-adsense-landing p{margin:6px 0;font-size:13px;color:rgba(255,255,255,0.92);max-width:880px;margin-left:auto;margin-right:auto}
@@ -66,11 +93,10 @@
   #gaingrid-adsense-landing ul{list-style:none;padding:0;margin:6px 0 10px;display:inline-block;text-align:left}
   #gaingrid-adsense-landing ul li{margin:6px 0;font-size:13px}
   #gaingrid-adsense-landing .gg-cta{display:inline-block;margin-top:8px;padding:6px 12px;border-radius:8px;text-decoration:none;font-weight:700;background:linear-gradient(45deg,var(--accent1),var(--accent2));box-shadow:0 6px 16px rgba(0,0,0,0.25)}
-  /* Ensure visible to crawlers even if JS toggles attributes */
   #gaingrid-adsense-landing[hidden]{display:block !important}
-  /* Keep the landing compact to avoid breaking your fixed card height */
   #gaingrid-adsense-landing .wrap{max-height:110px;overflow:auto;padding-right:6px}
   @media (max-width:420px){ #gaingrid-adsense-landing h1{font-size:16px} #gaingrid-adsense-landing p{font-size:12px} }
+
 </style>
 </head>
 <body>
@@ -78,13 +104,9 @@
     <div class="card" id="root">
       <div class="topbar">
         <div style="display:flex;align-items:center;gap:12px;">
-          <!-- GainGrid logo (dim) -->
-          <div class="gg-logo" aria-hidden="false">
-            <div class="gg-mark" title="Gain-Grid">GG</div>
-            <div>
-              <div class="gg-title-dim">Gain-Grid</div>
-              <div class="gg-sub">Hosted</div>
-            </div>
+          <!-- GainGrid gradient-filled bold text logo -->
+          <div>
+            <div class="gg-logo-text" aria-hidden="false">Gain-Grid</div>
           </div>
           <div class="small">Hosted view</div>
         </div>
@@ -94,7 +116,7 @@
       </div>
 
       <div class="content" style="flex:1 1 auto;display:flex;flex-direction:column">
-        <!-- ===== GAINGRID ADSENSE LANDING (visible in Public & Deeplink modes) ===== -->
+        <!-- landing -->
         <section id="gaingrid-adsense-landing" aria-labelledby="gg-title" role="region">
           <div class="wrap">
             <h1 id="gg-title">Welcome to GainGrid</h1>
@@ -114,19 +136,46 @@
             <div style="margin-top:6px;font-size:12px;color:rgba(255,255,255,0.9);">The GainGrid app runs in your browser. If you don't see the app, please enable JavaScript.</div>
           </noscript>
         </section>
-        <!-- ===== End landing content ===== -->
 
         <div id="adPlayer" class="ad-player" aria-live="polite">
           <div id="adPlaceholder" class="small">Ad player area</div>
-          <!-- progress UI overlay -->
+
+          <!-- Circular loader & ring overlay (initially hidden in public mode) -->
+          <div id="circleContainer" style="position:absolute;right:18px;top:18px;display:none;z-index:60;">
+            <div class="circle-wrap" id="circleWrap" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+              <!-- SVG ring -->
+              <svg class="progress-ring" viewBox="0 0 88 88" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#c471ed"/>
+                    <stop offset="50%" stop-color="#ff6b9d"/>
+                    <stop offset="100%" stop-color="#ff4d79"/>
+                  </linearGradient>
+                </defs>
+                <circle class="ring-circle-bg" cx="44" cy="44" r="36"></circle>
+                <circle class="ring-circle" cx="44" cy="44" r="36" stroke-dasharray="226.194" stroke-dashoffset="226.194"></circle>
+              </svg>
+
+              <!-- spinner (shown briefly before countdown) -->
+              <div class="loader-spinner hidden" id="loaderSpinner" aria-hidden="true">
+                <div class="spinner-dot"></div>
+                <div class="spinner-dot"></div>
+                <div class="spinner-dot"></div>
+              </div>
+
+              <div class="circle-number" id="circleNumber">—</div>
+            </div>
+          </div>
+
+          <!-- progress small text -->
           <div class="progress-text" id="progressText" style="display:none">Loading…</div>
-          <div class="progress-wrap" id="progressWrap" style="display:none"><div class="progress-bar" id="progressBar"></div></div>
         </div>
 
         <!-- Controls: hidden in public mode, visible only for deeplink payload -->
         <div id="controls" class="controls hidden" role="region" aria-label="Ad controls">
-          <div class="countdown" id="countdown">—</div>
-          <button id="claimBtn" class="btn" disabled>Claim / Send Result</button>
+          <!-- Keep countdown element for compatibility (hidden visually because circle shows) -->
+          <div class="countdown hidden" id="countdown">—</div>
+          <button id="claimBtn" class="btn" disabled style="opacity:0;transform:scale(0.98);">Claim / Send Result</button>
         </div>
 
         <div class="note" id="note" aria-hidden="false">Waiting for deeplink or public visit...</div>
@@ -138,13 +187,11 @@
 
 <script>
 /* =========================
-  Hosted HTML — dual-mode:
-  - PUBLIC: show ad area only (AdSense -> custom provider iframe -> Adsterra -> fallback video)
-  - DEEPLINK/HASH/POSTMESSAGE: authoritative payload, show countdown & claim, send results to BOT_WEBHOOK
+  Hosted HTML — dual-mode (enhanced with circle loader + ad_skiped on close)
   ========================= */
 
 /* ===== CONFIG (edit only if needed) ===== */
-const BOT_WEBHOOK = "https://gaingrid.bots.business/loadweb"; // changed to loadweb per request
+const BOT_WEBHOOK = "https://gaingrid.bots.business/loadweb"; // loadweb endpoint (kept)
 const HOSTED_SESSION_KEY = 'gg_hosted_authoritative_payload';
 const ADSTER_SCRIPT_KEY = 'a8702b8b4c48420a3815542007f1c0df';
 const ADSTER_SCRIPT_SRC = "//www.highperformanceformat.com/" + ADSTER_SCRIPT_KEY + "/invoke.js";
@@ -157,7 +204,7 @@ function nowISO(){ return (new Date()).toISOString(); }
 function randChoice(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 function safeParse(s){ try{ return JSON.parse(s); }catch(e){ return null; } }
 
-/* ===== small deterministic hash for user id (used for user-specific timer mapping) ===== */
+/* deterministic hash for mapping timers per user */
 function simpleHashToInt(s){
   try{
     const str = String(s||'');
@@ -167,7 +214,7 @@ function simpleHashToInt(s){
   }catch(e){ return Math.floor(Math.random()*1000000); }
 }
 
-/* ===== decode helpers ===== */
+/* ===== decode helpers (kept) ===== */
 function decodeBase64UrlSafe(raw){
   if(!raw) return null;
   try{
@@ -181,15 +228,12 @@ function decodeBase64UrlSafe(raw){
 function tryDecodePayloadString(raw){
   if(!raw) return null;
   try{
-    // url-encoded JSON
     if((raw.indexOf('%7B') === 0 || raw.indexOf('%5B') === 0) || raw.indexOf('%22') !== -1){
       try { return JSON.parse(decodeURIComponent(raw)); } catch(e){}
     }
-    // raw JSON
     if(raw[0] === '{' || raw[0] === '['){
       try { return JSON.parse(raw); } catch(e){}
     }
-    // try base64
     const maybe = decodeBase64UrlSafe(raw);
     if(maybe) return maybe;
     try{ return JSON.parse(decodeURIComponent(raw));}catch(e){}
@@ -197,7 +241,7 @@ function tryDecodePayloadString(raw){
   return null;
 }
 
-/* ===== ad provider injection helpers ===== */
+/* ===== ad provider injection helpers (kept) ===== */
 async function injectAdsense(holder){
   try{
     holder.innerHTML = '';
@@ -252,19 +296,16 @@ function showFallbackVideo(holder){
   }catch(e){ return false; }
 }
 
-/* ===== helper: compute secs with user mapping & ranges ===== */
+/* ===== compute secs with user mapping & ranges (kept logic, extended) ===== */
 function computeSecs(authoritativePayload){
   try{
-    // 1) explicit numeric secs
     if(authoritativePayload && authoritativePayload.secs && !isNaN(Number(authoritativePayload.secs))){
       return Number(authoritativePayload.secs);
     }
-    // 2) explicit min/max range
     if(authoritativePayload && authoritativePayload.secs_min && authoritativePayload.secs_max){
       const min = Number(authoritativePayload.secs_min) || 0;
       const max = Number(authoritativePayload.secs_max) || min;
       if(max <= min) return min;
-      // If user id present, make deterministic by hashing
       if(authoritativePayload.user && (authoritativePayload.user.user_id || authoritativePayload.user_id)){
         const uid = (authoritativePayload.user.user_id || authoritativePayload.user_id);
         const h = simpleHashToInt(uid);
@@ -272,9 +313,7 @@ function computeSecs(authoritativePayload){
       }
       return Math.floor(Math.random()*(max-min+1)) + min;
     }
-    // 3) explicit list of seconds
     if(authoritativePayload && Array.isArray(authoritativePayload.secs_list) && authoritativePayload.secs_list.length){
-      // deterministic for user if user id present
       if(authoritativePayload.user && (authoritativePayload.user.user_id || authoritativePayload.user_id)){
         const uid = (authoritativePayload.user.user_id || authoritativePayload.user_id);
         const h = simpleHashToInt(uid);
@@ -282,69 +321,70 @@ function computeSecs(authoritativePayload){
       }
       return randChoice(authoritativePayload.secs_list);
     }
-    // 4) fallback DURS but attempt deterministic mapping per user
     const DURS = [30,40,50,60];
     if(authoritativePayload && authoritativePayload.user && (authoritativePayload.user.user_id || authoritativePayload.user_id)){
       const uid = (authoritativePayload.user.user_id || authoritativePayload.user_id);
       const h = simpleHashToInt(uid);
       return DURS[h % DURS.length];
     }
-    // 5) final fallback random choice
     return randChoice(DURS);
   }catch(e){
     return 30;
   }
 }
 
-/* ===== core: start countdown & POST to webhook (deeplink mode only) ===== */
+/* ===== ring/progress helpers ===== */
+const ringRadius = 36;
+const ringCirc = 2 * Math.PI * ringRadius; // stroke-dasharray
+function setRingProgress(percent){
+  try{
+    const ring = document.querySelector('.ring-circle');
+    if(!ring) return;
+    const offset = ringCirc * (1 - (percent/100));
+    ring.style.strokeDasharray = ringCirc;
+    ring.style.strokeDashoffset = offset;
+    const wrap = el('circleWrap');
+    wrap.setAttribute('aria-valuenow', Math.round(percent));
+  }catch(e){}
+}
+
+/* ===== core variables ===== */
 let countdownTimer = null;
 let sessionActive = false;
 let sessionCompleted = false;
 let sessionPayload = null;
 
-function setProgressVisible(visible){
-  try{
-    el('progressWrap').style.display = visible ? 'block' : 'none';
-    el('progressText').style.display = visible ? 'block' : 'none';
-  }catch(e){}
-}
-function setProgressPercent(p){
-  try{ el('progressBar').style.width = Math.max(0, Math.min(100, p)) + '%'; }catch(e){}
-}
-function updateProgressText(text){
-  try{ el('progressText').textContent = text; }catch(e){}
-}
+/* ===== UI helpers ===== */
+function showCircle(){ try{ el('circleContainer').style.display = 'block'; el('loaderSpinner').classList.remove('hidden'); el('progressText').style.display = 'block'; }catch(e){} }
+function hideCircle(){ try{ const cw = el('circleWrap'); cw.classList.add('circle-fadeout'); setTimeout(()=>{ el('circleContainer').style.display = 'none'; cw.classList.remove('circle-fadeout'); }, 420); el('progressText').style.display = 'none'; }catch(e){} }
+function showClaimButton(){ try{ const btn = el('claimBtn'); btn.style.opacity = '0'; btn.style.transform = 'scale(0.92)'; btn.disabled = false; btn.classList.add('btn-pop'); btn.classList.add('btn-pulse'); btn.style.opacity = '1'; btn.style.transform = 'scale(1)'; btn.scrollIntoView({behavior:'smooth', block:'center'}); }catch(e){} }
+function hideClaimButton(){ try{ const btn = el('claimBtn'); btn.disabled = true; btn.style.opacity='0'; btn.classList.remove('btn-pulse'); }catch(e){} }
 
+/* ===== startCountdownAndReport (integrated loader + circle + pop claim) ===== */
 function startCountdownAndReport(authoritativePayload, source = 'deeplink'){
   try{
     if(!authoritativePayload || typeof authoritativePayload !== 'object') return;
-    // store authoritative copy
     try{ sessionStorage.setItem(HOSTED_SESSION_KEY, JSON.stringify(authoritativePayload)); }catch(e){}
     sessionActive = true;
     sessionCompleted = false;
     sessionPayload = authoritativePayload;
 
-    // determine secs (now uses computeSecs helper)
+    // determine secs via computeSecs
     const secs = Number(computeSecs(authoritativePayload)) || 30;
     const ad_id = authoritativePayload.ad_id || authoritativePayload.id || ('host_ad_' + Date.now());
     const reward = authoritativePayload.reward || authoritativePayload.r || authoritativePayload.base || 0;
 
-    // show controls
+    // show controls and hide default landing
     el('controls').classList.remove('hidden');
     el('gaingrid-adsense-landing').style.display = 'none';
-    el('note').textContent = `Ad: ${ad_id} — running ${secs}s`;
+    el('note').textContent = `Ad: ${ad_id} — preparing ${secs}s`;
     el('countdown').textContent = secs;
     el('claimBtn').disabled = true;
+    hideClaimButton();
 
-    // show VIP if present
     try{ if(authoritativePayload.vip_level) el('vipInfo').textContent = 'VIP: ' + authoritativePayload.vip_level; }catch(e){}
 
-    // progress UI init
-    setProgressVisible(true);
-    setProgressPercent(0);
-    updateProgressText(`0 / ${secs}s`);
-
-    // ensure ad provider visible (prefer AdSense -> custom -> adsterra -> video)
+    // show ad provider
     (async ()=>{
       const holder = el('adPlayer');
       let ok = false;
@@ -354,50 +394,68 @@ function startCountdownAndReport(authoritativePayload, source = 'deeplink'){
       if(!ok) showFallbackVideo(holder);
     })();
 
-    // countdown
-    let remaining = secs;
-    if(countdownTimer) clearInterval(countdownTimer);
-    const startTs = Date.now();
-    countdownTimer = setInterval(()=>{
-      remaining--;
-      el('countdown').textContent = remaining;
-      // progress percent
-      const elapsed = Math.round((Date.now() - startTs)/1000);
-      const pct = Math.min(100, Math.round((elapsed / secs) * 100));
-      setProgressPercent(pct);
-      updateProgressText(`${elapsed} / ${secs}s`);
+    // show circle and initial loading spinner for ~800ms, then countdown
+    showCircle();
+    el('loaderSpinner').classList.remove('hidden');
+    el('circleNumber').textContent = ''; // while loading
+    setRingProgress(0);
+    el('progressText').textContent = 'Loading…';
 
-      if(remaining <= 0){
-        clearInterval(countdownTimer);
-        countdownTimer = null;
-        sessionCompleted = true;
-        sessionActive = false;
-        el('claimBtn').disabled = false;
-        el('note').textContent = 'Countdown finished — result posted to webhook.';
-        setProgressPercent(100);
-        updateProgressText(`${secs} / ${secs}s`);
-        // prepare result payload
-        const result = {
-          ad_id: ad_id,
-          reward: reward,
-          base: authoritativePayload.base || 0,
-          vip_level: authoritativePayload.vip_level || authoritativePayload.vip || null,
-          user: authoritativePayload.user || authoritativePayload.user_id || null,
-          status: 'completed',
-          ts: nowISO(),
-          original_payload: authoritativePayload
-        };
-        // send automatically (preserve previous behavior)
-        sendToWebhook(result).catch(()=>{});
-        // leave page open — manual close is performed only on manual claim unless parent instructs otherwise
-      }
-    }, 1000);
+    // brief loading before countdown
+    setTimeout(()=>{
+      // hide spinner and start countdown
+      el('loaderSpinner').classList.add('hidden');
+      let remaining = secs;
+      el('circleNumber').textContent = remaining;
+      setRingProgress(0);
+      el('progressText').textContent = `0 / ${secs}s`;
 
-    // manual claim
+      // cleanup any existing timer
+      if(countdownTimer) clearInterval(countdownTimer);
+      const startTs = Date.now();
+      countdownTimer = setInterval(()=>{
+        const elapsed = Math.round((Date.now() - startTs)/1000);
+        const pct = Math.min(100, Math.round((elapsed / secs) * 100));
+        setRingProgress(pct);
+        el('progressText').textContent = `${elapsed} / ${secs}s`;
+
+        const newRemaining = Math.max(0, secs - elapsed);
+        el('circleNumber').textContent = newRemaining;
+        el('countdown').textContent = newRemaining;
+
+        if(newRemaining <= 0){
+          clearInterval(countdownTimer);
+          countdownTimer = null;
+          sessionCompleted = true;
+          sessionActive = false;
+          // after countdown finishes, post automatically and show claim
+          el('note').textContent = 'Countdown finished — result posted to webhook.';
+          const result = {
+            ad_id: ad_id,
+            reward: reward,
+            base: authoritativePayload.base || 0,
+            vip_level: authoritativePayload.vip_level || authoritativePayload.vip || null,
+            user: authoritativePayload.user || authoritativePayload.user_id || null,
+            status: 'completed',
+            ts: nowISO(),
+            original_payload: authoritativePayload
+          };
+          // send automatically (do not close here; user may want to hit claim to close)
+          sendToWebhook(result).then(()=>{ /* ok */ }).catch(()=>{ /* ignore */ });
+
+          // animate circle out and show claim button
+          hideCircle();
+          // small delay then show claim button
+          setTimeout(()=> { showClaimButton(); el('note').textContent = 'Tap Claim to confirm and close.'; }, 320);
+        }
+      }, 250);
+    }, 700); // loader duration
+
+    // manual claim click (existing behavior preserved)
     el('claimBtn').onclick = function(){
-      // manual claim allowed after countdown
       if(el('claimBtn').disabled) return;
       el('claimBtn').disabled = true;
+      el('claimBtn').classList.remove('btn-pulse');
       sessionCompleted = true;
       sessionActive = false;
       const result = {
@@ -410,20 +468,14 @@ function startCountdownAndReport(authoritativePayload, source = 'deeplink'){
         ts: nowISO(),
         original_payload: authoritativePayload
       };
-      // send and then close the hosted view (attempt)
-      sendToWebhook(result).then(()=> {
-        // after send attempt, request close
-        requestCloseHost();
-      }).catch(()=>{
-        // still attempt close even on failure
-        requestCloseHost();
-      });
+      // send and then close
+      sendToWebhook(result).then(()=> { requestCloseHost(); }).catch(()=> { requestCloseHost(); });
     };
 
   }catch(e){ console.warn('startCountdownAndReport err', e); dbg('count err'); }
 }
 
-/* ===== send to loadweb (keepalive) ===== */
+/* ===== sendToWebhook (keeps loadweb endpoint) ===== */
 function sendToWebhook(data){
   return new Promise((resolve, reject) => {
     try{
@@ -444,7 +496,6 @@ function sendToWebhook(data){
         resolve(true);
         return;
       }
-      // fallback to fetch; use keepalive when available
       fetch(BOT_WEBHOOK, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: body, keepalive:true })
         .then(()=> {
           dbg('webhook sent fetch: ' + (data.status||''));
@@ -453,7 +504,6 @@ function sendToWebhook(data){
         }).catch((err)=>{
           dbg('webhook fetch err');
           el('note').textContent = 'Failed to post result';
-          // still resolve to allow close attempt; caller can handle
           resolve(false);
         });
     }catch(e){
@@ -463,35 +513,29 @@ function sendToWebhook(data){
   });
 }
 
-/* ===== request close: try Telegram WebApp close, then parent postMessage, then window.close() ===== */
+/* ===== requestCloseHost: try Telegram.WebApp.close(), parent postMessage, window.close() ===== */
 function requestCloseHost(){
   try{
-    // attempt Telegram WebApp (if available)
     try{
       if(window.Telegram && Telegram.WebApp && typeof Telegram.WebApp.close === 'function'){
         try{ Telegram.WebApp.close(); return; }catch(e){}
       }
-      // Some builds expose Telegram.WebApp differently
       if(window.Telegram && window.Telegram.WebApp && typeof window.Telegram.WebApp.close === 'function'){
         try{ window.Telegram.WebApp.close(); return; }catch(e){}
       }
     }catch(e){}
-    // postMessage to parent (parent listener handles 'close_hosted')
     try{ parent.postMessage({ type: 'close_hosted' }, '*'); }catch(e){}
-    // fallback: try window.close()
     try{ window.close(); }catch(e){}
-    // if still open, set a short timer to attempt again
     setTimeout(()=>{ try{ parent.postMessage({ type: 'close_hosted' }, '*'); }catch(e){} try{ window.close(); }catch(e){} }, 250);
   }catch(err){ console.warn('requestCloseHost err', err); }
 }
 
-/* ===== skip/abort detection: alert webhook if user navigates/close early ===== */
+/* ===== finalizeAsSkippedIfActive: send ad_skiped (user requested exact string) ===== */
 function finalizeAsSkippedIfActive(reason){
   try{
     if(!sessionActive || sessionCompleted) return;
     sessionActive = false;
     sessionCompleted = false;
-    // prepare skipped payload
     const ad_id = sessionPayload && (sessionPayload.ad_id || sessionPayload.id) ? (sessionPayload.ad_id || sessionPayload.id) : ('host_ad_' + Date.now());
     const reward = sessionPayload && (sessionPayload.reward || sessionPayload.base) ? (sessionPayload.reward || sessionPayload.base) : 0;
     const result = {
@@ -500,27 +544,30 @@ function finalizeAsSkippedIfActive(reason){
       base: sessionPayload && sessionPayload.base || 0,
       vip_level: sessionPayload && (sessionPayload.vip_level || sessionPayload.vip) || null,
       user: sessionPayload && (sessionPayload.user || sessionPayload.user_id) || null,
-      status: 'skipped',
+      status: 'ad_skiped', // per your request: send ad_skiped to loadweb
       reason: reason || 'user_navigated_or_closed',
       ts: nowISO(),
       original_payload: sessionPayload || null
     };
+    // attempt to send (do not block)
     sendToWebhook(result).then(()=>{/* nothing */}).catch(()=>{/* nothing */});
   }catch(e){ console.warn('finalizeAsSkippedIfActive err', e); }
 }
 
-// beforeunload: try to inform parent/bot that user skipped if countdown still running
+/* ===== lifecycle events: beforeunload / pagehide / visibilitychange -> send ad_skiped ===== */
 window.addEventListener('beforeunload', function(ev){
   try{
     finalizeAsSkippedIfActive('beforeunload');
   }catch(e){}
 });
-
-// visibilitychange: if tab becomes hidden and session active for a short time, attempt to mark skipped
+window.addEventListener('pagehide', function(ev){
+  try{
+    finalizeAsSkippedIfActive('pagehide');
+  }catch(e){}
+});
 document.addEventListener('visibilitychange', function(){
   try{
     if(document.visibilityState === 'hidden'){
-      // schedule a short delay — host might just be switching focus
       setTimeout(()=> {
         if(document.visibilityState === 'hidden'){
           finalizeAsSkippedIfActive('visibility_hidden');
@@ -530,16 +577,13 @@ document.addEventListener('visibilitychange', function(){
   }catch(e){}
 });
 
-/* ===== postMessage listener so parent iframe can send authoritative payload directly ===== */
+/* ===== postMessage listener (kept) ===== */
 window.addEventListener('message', function(ev){
   try{
-    // Accept messages from any origin (gain.web may use different origin) — do not block for now
     const d = ev.data || {};
     if(!d || typeof d !== 'object') return;
-    // expected: { type: 'start_payload', payload: { ... } }
     if(d.type === 'start_payload' && d.payload){
       const payload = d.payload;
-      // Accept if object or string (string may be base64/json)
       let obj = null;
       if(typeof payload === 'string') obj = tryDecodePayloadString(payload);
       else obj = payload;
@@ -549,7 +593,6 @@ window.addEventListener('message', function(ev){
       }
       return;
     }
-    // handle close request from parent (if parent wants to close hosted child)
     if(d.type === 'close_hosted'){
       try{ window.close(); }catch(e){}
       return;
@@ -557,16 +600,15 @@ window.addEventListener('message', function(ev){
   }catch(e){ console.warn('message handler err', e); }
 }, false);
 
-/* ===== decode incoming payloads (query start / hash / hash path) ===== */
+/* ===== decode incoming payloads (query start / hash / path) (kept) ===== */
 function getQueryParams(){
   const s = location.search.replace(/^\?/,''); if(!s) return {};
   return s.split('&').filter(Boolean).map(p=>{ const i=p.indexOf('='); if(i<0) return [decodeURIComponent(p),'']; return [decodeURIComponent(p.slice(0,i)), decodeURIComponent(p.slice(i+1))]; }).reduce((o,[k,v])=>{ o[k]=v; return o; }, {});
 }
 
-/* ===== boot: check query/hash then public mode ===== */
+/* ===== boot (kept) ===== */
 function boot(){
   try{
-    // 1) query ?start=
     const qp = getQueryParams();
     if(qp.start){
       const decoded = tryDecodePayloadString(qp.start);
@@ -577,16 +619,13 @@ function boot(){
       }
     }
 
-    // 2) hash-based
     const hraw = (location.hash || '').replace(/^#/,'');
     if(hraw){
-      // path-like: #/ad?ad_id=...
       if(hraw.startsWith('/')){
         const parts = hraw.split('?'); const path = parts[0].replace(/^\//,'');
         const hashQP = {};
-        if(parts[1]) parts[1].split('&').forEach(p=>{ const i=p.indexOf('='); if(i>=0) hashQP[decodeURIComponent(p.slice(0,i))]=decodeURIComponent(p.slice(i+1)); else hashQP[decodeURIComponent(p)]= ''; });
+        if(parts[1]) parts[1].split('&').forEach(p=>{ const i=p.indexOf('='); if(i>=0) hashQP[decodeURIComponent(p.slice(0,i))]=decodeURIComponent(p.slice(i+1)); else hashQP[decodeURIComponent(p)]=''; });
         if(path === 'ad' && (hashQP.ad_id || hashQP.id || hashQP.start)){
-          // if start param exists and is base64/json use it
           if(hashQP.start){
             const dec = tryDecodePayloadString(hashQP.start);
             if(dec && typeof dec === 'object'){ el('note').textContent = 'Hash path payload (start) received.'; startCountdownAndReport(dec); return; }
@@ -597,7 +636,6 @@ function boot(){
           return;
         }
       } else {
-        // pure hash could be base64 or urlencoded JSON
         const decoded = tryDecodePayloadString(decodeURIComponent(hraw));
         if(decoded && typeof decoded === 'object'){
           el('note').textContent = 'Hash base64 payload received.';
@@ -607,23 +645,18 @@ function boot(){
       }
     }
 
-    // 3) sessionStorage fallback
     try{
       const sess = sessionStorage.getItem(HOSTED_SESSION_KEY);
       if(sess){
         const obj = safeParse(sess);
         if(obj && typeof obj === 'object'){
-          // if session exists but no active countdown, we still can resume UI in completed/idle state
           el('note').textContent = 'Resumed session (no active countdown).';
-          // do not auto-start if not authoritative now — leave as public mode
         }
       }
     }catch(e){}
 
-    // no authoritative payload => PUBLIC MODE
     el('note').textContent = 'Public mode — ad area (no controls).';
     el('controls').classList.add('hidden');
-    // show ad area: prefer AdSense -> custom provider -> Adsterra -> fallback video
     (async ()=>{
       const holder = el('adPlayer');
       let ok = false;
