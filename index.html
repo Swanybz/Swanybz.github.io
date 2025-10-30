@@ -30,6 +30,20 @@
   .note{margin-top:8px;color:rgba(255,255,255,0.6);font-size:12px;text-align:center}
   .hidden{display:none}
   #dbg{position:absolute;right:10px;bottom:10px;padding:6px 8px;background:rgba(0,0,0,0.6);border-radius:6px;font-size:11px;color:#fff;z-index:50;display:none}
+
+  /* ===== Scoped AdSense landing styles (won't override existing rules) ===== */
+  #gaingrid-adsense-landing{background:rgba(255,255,255,0.02);border-radius:8px;padding:12px;margin-bottom:10px;color:#fff}
+  #gaingrid-adsense-landing h1{margin:0 0 6px;font-size:18px;line-height:1.05}
+  #gaingrid-adsense-landing p{margin:6px 0;font-size:13px;color:rgba(255,255,255,0.92);max-width:880px;margin-left:auto;margin-right:auto}
+  #gaingrid-adsense-landing h3{margin-top:10px;margin-bottom:6px;font-size:14px}
+  #gaingrid-adsense-landing ul{list-style:none;padding:0;margin:6px 0 10px;display:inline-block;text-align:left}
+  #gaingrid-adsense-landing ul li{margin:6px 0;font-size:13px}
+  #gaingrid-adsense-landing .gg-cta{display:inline-block;margin-top:8px;padding:6px 12px;border-radius:8px;text-decoration:none;font-weight:700;background:linear-gradient(45deg,var(--accent1),var(--accent2));box-shadow:0 6px 16px rgba(0,0,0,0.25)}
+  /* Ensure visible to crawlers even if JS toggles attributes */
+  #gaingrid-adsense-landing[hidden]{display:block !important}
+  /* Keep the landing compact to avoid breaking your fixed card height */
+  #gaingrid-adsense-landing .wrap{max-height:110px;overflow:auto;padding-right:6px}
+  @media (max-width:420px){ #gaingrid-adsense-landing h1{font-size:16px} #gaingrid-adsense-landing p{font-size:12px} }
 </style>
 </head>
 <body>
@@ -43,6 +57,28 @@
       </div>
 
       <div class="content" style="flex:1 1 auto;display:flex;flex-direction:column">
+        <!-- ===== GAINGRID ADSENSE LANDING (visible in Public & Deeplink modes) ===== -->
+        <section id="gaingrid-adsense-landing" aria-labelledby="gg-title" role="region">
+          <div class="wrap">
+            <h1 id="gg-title">Welcome to GainGrid</h1>
+            <p>GainGrid is a Telegram-integrated platform that rewards users for engaging with ads, completing tasks, and playing fun games.</p>
+            <p>Earn G-Coin, upgrade to VIP, and withdraw in USD, BTC, USDT, and more.</p>
+            <h3>How it Works:</h3>
+            <ul>
+              <li>• Watch ads and earn G-Coin</li>
+              <li>• Complete daily promotional tasks</li>
+              <li>• Play games and get rewarded</li>
+              <li>• Withdraw your earnings easily</li>
+            </ul>
+            <p><strong>Connect with our Telegram bot to get started!</strong></p>
+            <p><a class="gg-cta" href="#app" role="button">Open GainGrid</a></p>
+          </div>
+          <noscript>
+            <div style="margin-top:6px;font-size:12px;color:rgba(255,255,255,0.9);">The GainGrid app runs in your browser. If you don't see the app, please enable JavaScript.</div>
+          </noscript>
+        </section>
+        <!-- ===== End landing content ===== -->
+
         <div id="adPlayer" class="ad-player" aria-live="polite">
           <div id="adPlaceholder" class="small">Ad player area</div>
         </div>
