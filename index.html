@@ -12,7 +12,6 @@
 <style>
   :root{
     --accent1:#ff6b9d; --accent2:#c471ed;
-    --accent-strong: linear-gradient(90deg,#7b2cbf,#ff2d95,#ff6b9d);
     --bg:linear-gradient(135deg,#0f1419 0,#1a2332 50%,#0d1117 100%);
   }
   *,*::before,*::after{box-sizing:border-box}
@@ -32,32 +31,7 @@
   .hidden{display:none}
   #dbg{position:absolute;right:10px;bottom:10px;padding:6px 8px;background:rgba(0,0,0,0.6);border-radius:6px;font-size:11px;color:#fff;z-index:50;display:none}
 
-  /* small progress bar + animation */
-  .progress-wrap{width:100%;height:10px;background:rgba(255,255,255,0.06);border-radius:999px;overflow:hidden;margin-top:10px}
-  .progress-fill{height:100%;width:0%;background:linear-gradient(90deg,#7b2cbf,#ff2d95,#ff6b9d);transition:width 0.3s linear}
-
-  /* processing pulse */
-  .processing {
-    position:relative;
-    display:inline-block;
-    padding:8px 12px;
-    border-radius:999px;
-    background:linear-gradient(90deg, rgba(255,255,255,0.03), rgba(255,255,255,0.02));
-    box-shadow: 0 6px 18px rgba(123,44,191,0.08);
-  }
-  .pulse {
-    position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
-    width:90%; height:90%; border-radius:999px; opacity:0; pointer-events:none;
-    background: radial-gradient(circle at center, rgba(255,45,149,0.12), rgba(123,44,191,0.06));
-    animation: pulse 1.6s infinite;
-  }
-  @keyframes pulse { 0%{opacity:0.6; transform:translate(-50%,-50%) scale(0.96)} 70%{opacity:0} 100%{opacity:0} }
-
-  /* topbar logo */
-  .gg-logo { display:flex; align-items:center; gap:10px; }
-  .gg-logo svg { height:28px; }
-
-  /* AdSense landing styles */
+  /* ===== Scoped AdSense landing styles (won't override existing rules) ===== */
   #gaingrid-adsense-landing{background:rgba(255,255,255,0.02);border-radius:8px;padding:12px;margin-bottom:10px;color:#fff}
   #gaingrid-adsense-landing h1{margin:0 0 6px;font-size:18px;line-height:1.05}
   #gaingrid-adsense-landing p{margin:6px 0;font-size:13px;color:rgba(255,255,255,0.92);max-width:880px;margin-left:auto;margin-right:auto}
@@ -65,34 +39,18 @@
   #gaingrid-adsense-landing ul{list-style:none;padding:0;margin:6px 0 10px;display:inline-block;text-align:left}
   #gaingrid-adsense-landing ul li{margin:6px 0;font-size:13px}
   #gaingrid-adsense-landing .gg-cta{display:inline-block;margin-top:8px;padding:6px 12px;border-radius:8px;text-decoration:none;font-weight:700;background:linear-gradient(45deg,var(--accent1),var(--accent2));box-shadow:0 6px 16px rgba(0,0,0,0.25)}
+  /* Ensure visible to crawlers even if JS toggles attributes */
   #gaingrid-adsense-landing[hidden]{display:block !important}
+  /* Keep the landing compact to avoid breaking your fixed card height */
   #gaingrid-adsense-landing .wrap{max-height:110px;overflow:auto;padding-right:6px}
-
-  @media (max-width:420px){
-    #gaingrid-adsense-landing h1{font-size:16px}
-    #gaingrid-adsense-landing p{font-size:12px}
-  }
+  @media (max-width:420px){ #gaingrid-adsense-landing h1{font-size:16px} #gaingrid-adsense-landing p{font-size:12px} }
 </style>
 </head>
 <body>
   <div class="viewport-wrap">
     <div class="card" id="root">
       <div class="topbar">
-        <div class="gg-logo" aria-hidden="false">
-          <!-- Embedded GainGrid SVG logo (gradient) -->
-          <svg viewBox="0 0 200 40" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="GainGrid">
-            <defs>
-              <linearGradient id="ggrad" x1="0" x2="1">
-                <stop offset="0" stop-color="#7b2cbf"/>
-                <stop offset="0.5" stop-color="#ff2d95"/>
-                <stop offset="1" stop-color="#ff6b9d"/>
-              </linearGradient>
-            </defs>
-            <text x="0" y="26" font-family="Inter, Arial" font-size="20" font-weight="700" fill="url(#ggrad)">GainGrid</text>
-          </svg>
-          <div class="small" style="opacity:0.9">Hosted view</div>
-        </div>
-
+        <div class="small">Hosted view</div>
         <div style="text-align:right">
           <div class="small" id="vipInfo">VIP: —</div>
         </div>
@@ -127,16 +85,7 @@
 
         <!-- Controls: hidden in public mode, visible only for deeplink payload -->
         <div id="controls" class="controls hidden" role="region" aria-label="Ad controls">
-          <div style="display:flex;flex-direction:column;align-items:center;">
-            <div class="processing" id="procWrap" style="display:none">
-              <div class="pulse"></div>
-              <div style="position:relative;z-index:2;display:flex;align-items:center;gap:10px;">
-                <div class="countdown" id="countdown">—</div>
-                <div style="font-size:13px;opacity:0.85">seconds</div>
-              </div>
-            </div>
-            <div class="progress-wrap" aria-hidden="false"><div class="progress-fill" id="progressFill"></div></div>
-          </div>
+          <div class="countdown" id="countdown">—</div>
           <button id="claimBtn" class="btn" disabled>Claim / Send Result</button>
         </div>
 
@@ -150,12 +99,12 @@
 <script>
 /* =========================
   Hosted HTML — dual-mode:
-  - PUBLIC: show ad area only (AdSense -> custom provider -> Adsterra -> fallback video)
-  - DEEPLINK/HASH: authoritative payload, show countdown & claim, send results to BOT_WEBHOOK (/loadweb)
+  - PUBLIC: show ad area only (AdSense -> custom provider iframe -> Adsterra -> fallback video)
+  - DEEPLINK/HASH/POSTMESSAGE: authoritative payload, show countdown & claim, send results to BOT_WEBHOOK
   ========================= */
 
 /* ===== CONFIG (edit only if needed) ===== */
-const BOT_WEBHOOK = "https://gaingrid.bots.business/loadweb"; // your on-webhook receiver (you said loadweb)
+const BOT_WEBHOOK = "https://gaingrid.bots.business/onWebhook"; // onWebhook receiver
 const HOSTED_SESSION_KEY = 'gg_hosted_authoritative_payload';
 const ADSTER_SCRIPT_KEY = 'a8702b8b4c48420a3815542007f1c0df';
 const ADSTER_SCRIPT_SRC = "//www.highperformanceformat.com/" + ADSTER_SCRIPT_KEY + "/invoke.js";
@@ -163,7 +112,7 @@ const CUSTOM_PROVIDER_URL = "https://experiencedbat.com/dbm/F.zudZGMN/vBZ_GeUM/J
 
 /* ===== utilities (kept names) ===== */
 const el = id => document.getElementById(id);
-function dbg(msg){ try{ el('dbg').style.display='block'; el('dbg').textContent = String(msg).slice(0,120); console.log('hosted:', msg); }catch(e){} }
+function dbg(msg){ try{ el('dbg').style.display='block'; el('dbg').textContent = String(msg).slice(0,140); console.log('hosted:', msg); }catch(e){} }
 function nowISO(){ return (new Date()).toISOString(); }
 function randChoice(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 function safeParse(s){ try{ return JSON.parse(s); }catch(e){ return null; } }
@@ -183,7 +132,7 @@ function tryDecodePayloadString(raw){
   if(!raw) return null;
   try{
     // url-encoded JSON
-    if(raw.indexOf('%7B') === 0 || raw.indexOf('%5B') === 0 || raw.indexOf('%22') !== -1){
+    if((raw.indexOf('%7B') === 0 || raw.indexOf('%5B') === 0) || raw.indexOf('%22') !== -1){
       try { return JSON.parse(decodeURIComponent(raw)); } catch(e){}
     }
     // raw JSON
@@ -255,64 +204,59 @@ function showFallbackVideo(holder){
 
 /* ===== core: start countdown & POST to webhook (deeplink mode only) ===== */
 let countdownTimer = null;
-let countdownRemaining = 0;
-const DURS = [30,40,50,60];
+let sessionActive = false;
+let sessionCompleted = false;
+let sessionPayload = null;
 
-function startCountdownAndReport(authoritativePayload){
+function startCountdownAndReport(authoritativePayload, source = 'deeplink'){
   try{
     if(!authoritativePayload || typeof authoritativePayload !== 'object') return;
     // store authoritative copy
     try{ sessionStorage.setItem(HOSTED_SESSION_KEY, JSON.stringify(authoritativePayload)); }catch(e){}
-    // determine secs - prefer authoritativePayload.secs, else random per-call
+    sessionActive = true;
+    sessionCompleted = false;
+    sessionPayload = authoritativePayload;
+
+    // determine secs
+    const DURS = [30,40,50,60];
     const secs = Number(authoritativePayload.secs) || randChoice(DURS);
     const ad_id = authoritativePayload.ad_id || authoritativePayload.id || ('host_ad_' + Date.now());
     const reward = authoritativePayload.reward || authoritativePayload.r || authoritativePayload.base || 0;
 
-    // show controls and visual processing
+    // show controls
     el('controls').classList.remove('hidden');
+    el('gaingrid-adsense-landing').style.display = 'none';
     el('note').textContent = `Ad: ${ad_id} — running ${secs}s`;
     el('countdown').textContent = secs;
-    el('procWrap').style.display = 'inline-block';
     el('claimBtn').disabled = true;
-    el('progressFill').style.width = '0%';
 
-    // inject provider (prefer AdSense -> custom -> adsterra -> video)
+    // show VIP if present
+    try{ if(authoritativePayload.vip_level) el('vipInfo').textContent = 'VIP: ' + authoritativePayload.vip_level; }catch(e){}
+
+    // ensure ad provider visible (prefer AdSense -> custom -> adsterra -> video)
     (async ()=>{
       const holder = el('adPlayer');
-      let ok = await injectAdsense(holder);
+      let ok = false;
+      try { ok = await injectAdsense(holder); } catch(e) { ok = false; }
       if(!ok) ok = injectCustomProvider(holder);
       if(!ok) ok = injectAdsterra(holder);
       if(!ok) showFallbackVideo(holder);
     })();
 
-    // countdown logic with progress animation
+    // countdown
     let remaining = secs;
-    countdownRemaining = remaining;
     if(countdownTimer) clearInterval(countdownTimer);
-    const startTs = Date.now();
     countdownTimer = setInterval(()=>{
-      const elapsed = Math.floor((Date.now() - startTs) / 1000);
-      remaining = Math.max(0, secs - elapsed);
-      countdownRemaining = remaining;
+      remaining--;
       el('countdown').textContent = remaining;
-      // progress %
-      const pct = Math.min(100, Math.round(((elapsed / secs) * 100)));
-      el('progressFill').style.width = pct + '%';
       if(remaining <= 0){
         clearInterval(countdownTimer);
+        countdownTimer = null;
+        sessionCompleted = true;
+        sessionActive = false;
         el('claimBtn').disabled = false;
-        el('note').textContent = 'Countdown finished — press Claim to send result.';
-        el('procWrap').style.display = 'none';
-        // auto-enable claim (but do not auto-send)
-        // also attach an auto-fallback post after small grace if user doesn't press (optional: we still require claim user action)
-      }
-    }, 250);
-
-    // manual claim handler
-    el('claimBtn').onclick = function(){
-      try{
-        el('claimBtn').disabled = true;
-        el('note').textContent = 'Sending result...';
+        el('note').textContent = 'Countdown finished — result posted to webhook.';
+        // prepare result payload
         const result = {
           ad_id: ad_id,
           reward: reward,
@@ -323,25 +267,36 @@ function startCountdownAndReport(authoritativePayload){
           ts: nowISO(),
           original_payload: authoritativePayload
         };
-        sendToWebhook(result, function(ok){
-          if(ok) {
-            el('note').textContent = 'Result posted. Closing...';
-            // wait 800-1200ms then close
-            setTimeout(()=> tryClose(), 1000);
-          } else {
-            el('note').textContent = 'Posted failed (retrying)...';
-            // still attempt close after small delay to avoid leaving user stuck, but keep visible
-            setTimeout(()=> tryClose(), 2500);
-          }
-        });
-      }catch(e){ console.warn('claim click err', e); dbg('claim err'); }
+        // send automatically
+        sendToWebhook(result);
+      }
+    }, 1000);
+
+    // manual claim
+    el('claimBtn').onclick = function(){
+      // manual claim allowed after countdown
+      if(el('claimBtn').disabled) return;
+      el('claimBtn').disabled = true;
+      sessionCompleted = true;
+      sessionActive = false;
+      const result = {
+        ad_id: ad_id,
+        reward: reward,
+        base: authoritativePayload.base || 0,
+        vip_level: authoritativePayload.vip_level || authoritativePayload.vip || null,
+        user: authoritativePayload.user || authoritativePayload.user_id || null,
+        status: 'claimed_manual',
+        ts: nowISO(),
+        original_payload: authoritativePayload
+      };
+      sendToWebhook(result);
     };
 
   }catch(e){ console.warn('startCountdownAndReport err', e); dbg('count err'); }
 }
 
-/* ===== send to /loadweb (keepalive) ===== */
-function sendToWebhook(data, cb){
+/* ===== send to onWebhook (keepalive) ===== */
+function sendToWebhook(data){
   try{
     const wrapper = { action: 'ads_validate', payload: data, meta: { ts: Date.now(), host: location.href } };
     const body = JSON.stringify(wrapper);
@@ -352,31 +307,60 @@ function sendToWebhook(data, cb){
         sent = navigator.sendBeacon(BOT_WEBHOOK, blob);
       }
     }catch(e){ sent = false; }
-    if(sent){
-      dbg('webhook sent (beacon)');
-      if(cb) cb(true);
-      return;
+    if(!sent){
+      fetch(BOT_WEBHOOK, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: body, keepalive:true })
+        .then(()=>{}).catch(()=>{});
     }
-    // fallback fetch
-    fetch(BOT_WEBHOOK, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: body, keepalive:true })
-      .then(res => { dbg('webhook ok'); if(cb) cb(res.ok); })
-      .catch(err => { console.warn('webhook POST failed', err); if(cb) cb(false); });
-  }catch(e){ console.warn('sendToWebhook err', e); if(cb) cb(false); dbg('webhook err'); }
+    dbg('webhook sent: ' + (data.status||''));
+    el('note').textContent = 'Result posted to webhook.';
+    // leave page open — parent can close iframe if desired
+  }catch(e){ console.warn('sendToWebhook err', e); dbg('webhook err'); el('note').textContent = 'Failed to post result'; }
 }
 
-/* ===== closure helper: tries Telegram.WebApp.close(), else window.close(), else postMessage to parent ===== */
-function tryClose(){
+/* ===== skip/abort detection: alert webhook if user navigates/close early ===== */
+function finalizeAsSkippedIfActive(reason){
   try{
-    // try Telegram WebApp first (in-app)
-    if(window.Telegram && Telegram.WebApp && typeof Telegram.WebApp.close === 'function'){
-      try{ Telegram.WebApp.close(); return; }catch(e){}
-    }
-    // try window.close
-    try { window.close(); } catch(e){}
-    // send a message to parent (in case parent listens)
-    try { window.parent && window.parent.postMessage({ type:'close_hosted', reason:'completed' }, '*'); }catch(e){}
-  }catch(e){ console.warn('tryClose err', e); }
+    if(!sessionActive || sessionCompleted) return;
+    sessionActive = false;
+    sessionCompleted = false;
+    // prepare skipped payload
+    const ad_id = sessionPayload && (sessionPayload.ad_id || sessionPayload.id) ? (sessionPayload.ad_id || sessionPayload.id) : ('host_ad_' + Date.now());
+    const reward = sessionPayload && (sessionPayload.reward || sessionPayload.base) ? (sessionPayload.reward || sessionPayload.base) : 0;
+    const result = {
+      ad_id: ad_id,
+      reward: reward,
+      base: sessionPayload && sessionPayload.base || 0,
+      vip_level: sessionPayload && (sessionPayload.vip_level || sessionPayload.vip) || null,
+      user: sessionPayload && (sessionPayload.user || sessionPayload.user_id) || null,
+      status: 'skipped',
+      reason: reason || 'user_navigated_or_closed',
+      ts: nowISO(),
+      original_payload: sessionPayload || null
+    };
+    sendToWebhook(result);
+  }catch(e){ console.warn('finalizeAsSkippedIfActive err', e); }
 }
+
+// beforeunload: try to inform parent/bot that user skipped if countdown still running
+window.addEventListener('beforeunload', function(ev){
+  try{
+    finalizeAsSkippedIfActive('beforeunload');
+  }catch(e){}
+});
+
+// visibilitychange: if tab becomes hidden and session active for a short time, attempt to mark skipped
+document.addEventListener('visibilitychange', function(){
+  try{
+    if(document.visibilityState === 'hidden'){
+      // schedule a short delay — host might just be switching focus
+      setTimeout(()=> {
+        if(document.visibilityState === 'hidden'){
+          finalizeAsSkippedIfActive('visibility_hidden');
+        }
+      }, 1200);
+    }
+  }catch(e){}
+});
 
 /* ===== decode incoming payloads (query start / hash / hash path) ===== */
 function getQueryParams(){
@@ -384,6 +368,34 @@ function getQueryParams(){
   return s.split('&').filter(Boolean).map(p=>{ const i=p.indexOf('='); if(i<0) return [decodeURIComponent(p),'']; return [decodeURIComponent(p.slice(0,i)), decodeURIComponent(p.slice(i+1))]; }).reduce((o,[k,v])=>{ o[k]=v; return o; }, {});
 }
 
+/* ===== postMessage listener so parent iframe can send authoritative payload directly ===== */
+window.addEventListener('message', function(ev){
+  try{
+    // Accept messages from any origin (gain.web may use different origin) — do not block for now
+    const d = ev.data || {};
+    if(!d || typeof d !== 'object') return;
+    // expected: { type: 'start_payload', payload: { ... } }
+    if(d.type === 'start_payload' && d.payload){
+      const payload = d.payload;
+      // Accept if object or string (string may be base64/json)
+      let obj = null;
+      if(typeof payload === 'string') obj = tryDecodePayloadString(payload);
+      else obj = payload;
+      if(obj && typeof obj === 'object'){
+        el('note').textContent = 'PostMessage payload received.';
+        startCountdownAndReport(obj, 'postmessage');
+      }
+      return;
+    }
+    // optional: handle hosted commands
+    if(d.type === 'close_hosted'){
+      try{ window.close(); }catch(e){}
+      return;
+    }
+  }catch(e){ console.warn('message handler err', e); }
+}, false);
+
+/* ===== boot: check query/hash then public mode ===== */
 function boot(){
   try{
     // 1) query ?start=
@@ -398,21 +410,27 @@ function boot(){
     }
 
     // 2) hash-based
-    const h = (location.hash || '').replace(/^#/,'');
-    if(h){
+    const hraw = (location.hash || '').replace(/^#/,'');
+    if(hraw){
       // path-like: #/ad?ad_id=...
-      if(h.startsWith('/')){
-        const parts = h.split('?'); const path = parts[0].replace(/^\//,'');
+      if(hraw.startsWith('/')){
+        const parts = hraw.split('?'); const path = parts[0].replace(/^\//,'');
         const hashQP = {};
         if(parts[1]) parts[1].split('&').forEach(p=>{ const i=p.indexOf('='); if(i>=0) hashQP[decodeURIComponent(p.slice(0,i))]=decodeURIComponent(p.slice(i+1)); else hashQP[decodeURIComponent(p)]= ''; });
-        if(path === 'ad' && (hashQP.ad_id || hashQP.id)){
+        if(path === 'ad' && (hashQP.ad_id || hashQP.id || hashQP.start)){
+          // if start param exists and is base64/json use it
+          if(hashQP.start){
+            const dec = tryDecodePayloadString(hashQP.start);
+            if(dec && typeof dec === 'object'){ el('note').textContent = 'Hash path payload (start) received.'; startCountdownAndReport(dec); return; }
+          }
           const payload = { ad_id: hashQP.ad_id || hashQP.id, secs: hashQP.secs || hashQP.duration, reward: hashQP.reward || hashQP.base, user: { user_id: hashQP.user_id || hashQP.uid || null } };
           el('note').textContent = 'Hash path payload received.';
           startCountdownAndReport(payload);
           return;
         }
       } else {
-        const decoded = tryDecodePayloadString(decodeURIComponent(h));
+        // pure hash could be base64 or urlencoded JSON
+        const decoded = tryDecodePayloadString(decodeURIComponent(hraw));
         if(decoded && typeof decoded === 'object'){
           el('note').textContent = 'Hash base64 payload received.';
           startCountdownAndReport(decoded);
@@ -421,13 +439,27 @@ function boot(){
       }
     }
 
+    // 3) sessionStorage fallback
+    try{
+      const sess = sessionStorage.getItem(HOSTED_SESSION_KEY);
+      if(sess){
+        const obj = safeParse(sess);
+        if(obj && typeof obj === 'object'){
+          // if session exists but no active countdown, we still can resume UI in completed/idle state
+          el('note').textContent = 'Resumed session (no active countdown).';
+          // do not auto-start if not authoritative now — leave as public mode
+        }
+      }
+    }catch(e){}
+
     // no authoritative payload => PUBLIC MODE
     el('note').textContent = 'Public mode — ad area (no controls).';
     el('controls').classList.add('hidden');
     // show ad area: prefer AdSense -> custom provider -> Adsterra -> fallback video
     (async ()=>{
       const holder = el('adPlayer');
-      let ok = await injectAdsense(holder);
+      let ok = false;
+      try { ok = await injectAdsense(holder); } catch(e) { ok = false; }
       if(!ok) ok = injectCustomProvider(holder);
       if(!ok) ok = injectAdsterra(holder);
       if(!ok) showFallbackVideo(holder);
