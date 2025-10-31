@@ -31,7 +31,7 @@
   .hidden{display:none}
   #dbg{position:absolute;right:10px;bottom:10px;padding:6px 8px;background:rgba(0,0,0,0.6);border-radius:6px;font-size:11px;color:#fff;z-index:50;display:none}
 
-  /* ==== GainGrid gradient text logo (bold, filled with gradient colors purple-red-pink) ==== */
+  /* Gradient text logo */
   .gg-logo-text {
     font-weight:900;
     font-size:18px;
@@ -43,7 +43,7 @@
     display:inline-block;
   }
 
-  /* ==== Circular loader + progress ring ==== */
+  /* Circular loader + progress ring */
   .circle-wrap { width:88px; height:88px; display:flex;align-items:center;justify-content:center; position:relative; }
   .loader-spinner { position:absolute; width:48px; height:48px; border-radius:50%; display:flex;align-items:center;justify-content:center; }
   .spinner-dot { width:8px; height:8px; border-radius:50%; background:rgba(255,255,255,0.9); opacity:0.12; animation:spinner 900ms linear infinite; }
@@ -52,7 +52,6 @@
   @keyframes spinner { 0%{ transform: translateY(-8px); }50%{ transform: translateY(0px); }100%{ transform: translateY(-8px); } }
 
   .progress-ring { width:88px; height:88px; transform: rotate(-90deg); }
-  .ring-svg { width:100%; height:100%; }
   .ring-circle-bg { stroke: rgba(255,255,255,0.06); stroke-width:8; fill:none; }
   .ring-circle { stroke-linecap: round; stroke-width:8; fill:none; stroke: url(#ringGradient); }
 
@@ -61,11 +60,9 @@
     text-shadow:0 1px 0 rgba(0,0,0,0.6);
   }
 
-  /* fade-out animation for the circle when finished */
   .circle-fadeout { animation:circleOut 380ms ease forwards; }
   @keyframes circleOut { to { transform: scale(0.85); opacity:0; } }
 
-  /* claim button pop/pulse/vibrate */
   .btn-pop {
     transform-origin:center;
     animation:popIn 420ms cubic-bezier(.2,.9,.3,1) forwards;
@@ -82,10 +79,9 @@
   }
   .btn-pulse { animation: pulse 900ms ease-in-out infinite; }
 
-  /* progress small text */
   .progress-text { position:absolute; left:12px; bottom:10px; font-size:11px; color:rgba(255,255,255,0.9); text-shadow:0 1px 0 rgba(0,0,0,0.6); }
 
-  /* scoped landing styles (kept) */
+  /* landing */
   #gaingrid-adsense-landing{background:rgba(255,255,255,0.02);border-radius:8px;padding:12px;margin-bottom:10px;color:#fff}
   #gaingrid-adsense-landing h1{margin:0 0 6px;font-size:18px;line-height:1.05}
   #gaingrid-adsense-landing p{margin:6px 0;font-size:13px;color:rgba(255,255,255,0.92);max-width:880px;margin-left:auto;margin-right:auto}
@@ -97,6 +93,8 @@
   #gaingrid-adsense-landing .wrap{max-height:110px;overflow:auto;padding-right:6px}
   @media (max-width:420px){ #gaingrid-adsense-landing h1{font-size:16px} #gaingrid-adsense-landing p{font-size:12px} }
 
+  /* helper: hide spinner by class */
+  .hidden { display:none !important; }
 </style>
 </head>
 <body>
@@ -104,7 +102,6 @@
     <div class="card" id="root">
       <div class="topbar">
         <div style="display:flex;align-items:center;gap:12px;">
-          <!-- GainGrid gradient-filled bold text logo -->
           <div>
             <div class="gg-logo-text" aria-hidden="false">Gain-Grid</div>
           </div>
@@ -116,7 +113,6 @@
       </div>
 
       <div class="content" style="flex:1 1 auto;display:flex;flex-direction:column">
-        <!-- landing -->
         <section id="gaingrid-adsense-landing" aria-labelledby="gg-title" role="region">
           <div class="wrap">
             <h1 id="gg-title">Welcome to GainGrid</h1>
@@ -140,11 +136,10 @@
         <div id="adPlayer" class="ad-player" aria-live="polite">
           <div id="adPlaceholder" class="small">Ad player area</div>
 
-          <!-- Circular loader & ring overlay (initially hidden in public mode) -->
+          <!-- circle container: default hidden; only shown for deeplink mode -->
           <div id="circleContainer" style="position:absolute;right:18px;top:18px;display:none;z-index:60;">
             <div class="circle-wrap" id="circleWrap" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-              <!-- SVG ring -->
-              <svg class="progress-ring" viewBox="0 0 88 88" xmlns="http://www.w3.org/2000/svg">
+              <svg class="progress-ring" viewBox="0 0 88 88" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                 <defs>
                   <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="0%">
                     <stop offset="0%" stop-color="#c471ed"/>
@@ -153,10 +148,10 @@
                   </linearGradient>
                 </defs>
                 <circle class="ring-circle-bg" cx="44" cy="44" r="36"></circle>
+                <!-- IMPORTANT: initial stroke-dasharray/stroke-dashoffset set inline to avoid race errors -->
                 <circle class="ring-circle" cx="44" cy="44" r="36" stroke-dasharray="226.194" stroke-dashoffset="226.194"></circle>
               </svg>
 
-              <!-- spinner (shown briefly before countdown) -->
               <div class="loader-spinner hidden" id="loaderSpinner" aria-hidden="true">
                 <div class="spinner-dot"></div>
                 <div class="spinner-dot"></div>
@@ -167,13 +162,10 @@
             </div>
           </div>
 
-          <!-- progress small text -->
           <div class="progress-text" id="progressText" style="display:none">Loading…</div>
         </div>
 
-        <!-- Controls: hidden in public mode, visible only for deeplink payload -->
         <div id="controls" class="controls hidden" role="region" aria-label="Ad controls">
-          <!-- Keep countdown element for compatibility (hidden visually because circle shows) -->
           <div class="countdown hidden" id="countdown">—</div>
           <button id="claimBtn" class="btn" disabled style="opacity:0;transform:scale(0.98);">Claim / Send Result</button>
         </div>
@@ -187,34 +179,32 @@
 
 <script>
 /* =========================
-  Hosted HTML — robust countdown & ring (defensive fixes)
+  Robust countdown/circle implementation
+  - Strictly avoid showing circle in PUBLIC mode
+  - Ensures animations and claim button appear after countdown
+  - Sends ad_skiped when user leaves early
   ========================= */
 
-/* ===== CONFIG (kept) ===== */
+/* CONFIG (kept) */
 const BOT_WEBHOOK = "https://gaingrid.bots.business/loadweb";
 const HOSTED_SESSION_KEY = 'gg_hosted_authoritative_payload';
 const ADSTER_SCRIPT_KEY = 'a8702b8b4c48420a3815542007f1c0df';
 const ADSTER_SCRIPT_SRC = "//www.highperformanceformat.com/" + ADSTER_SCRIPT_KEY + "/invoke.js";
 const CUSTOM_PROVIDER_URL = "https://experiencedbat.com/dbm/F.zudZGMN/vBZ_GeUM/Jelm/9ruAZ/UjlGkpPiTuYT2/ORDok/w/NEjDU-t/Ntj/Y/4_OhTuAb2iNQixZWs/aKWn1rpydHDr0IxU";
 
-/* ===== utilities (kept names) ===== */
+/* small helpers */
 const el = id => { try{ return document.getElementById(id); }catch(e){ return null; } };
 function dbg(msg){ try{ const d = el('dbg'); if(d){ d.style.display='block'; d.textContent = String(msg).slice(0,140); } console.log('hosted:', msg); }catch(e){} }
 function nowISO(){ return (new Date()).toISOString(); }
-function randChoice(arr){ return arr && arr.length ? arr[Math.floor(Math.random()*arr.length)] : null; }
+function randChoice(arr){ return arr && arr.length ? arr[Math.floor(Math.random()*arr.length)] : 30; }
 function safeParse(s){ try{ return JSON.parse(s); }catch(e){ return null; } }
 
 /* deterministic hash for mapping timers per user */
 function simpleHashToInt(s){
-  try{
-    const str = String(s||'');
-    let h=2166136261;
-    for(let i=0;i<str.length;i++){ h ^= str.charCodeAt(i); h += (h<<1)+(h<<4)+(h<<7)+(h<<8)+(h<<24); }
-    return Math.abs(h);
-  }catch(e){ return Math.floor(Math.random()*1000000); }
+  try{ const str=String(s||''); let h=2166136261; for(let i=0;i<str.length;i++){ h ^= str.charCodeAt(i); h += (h<<1)+(h<<4)+(h<<7)+(h<<8)+(h<<24);} return Math.abs(h);}catch(e){ return Math.floor(Math.random()*1000000); }
 }
 
-/* ===== decode helpers (kept) ===== */
+/* decode helpers (kept) */
 function decodeBase64UrlSafe(raw){
   if(!raw) return null;
   try{
@@ -241,103 +231,44 @@ function tryDecodePayloadString(raw){
   return null;
 }
 
-/* ===== ad provider injection helpers (kept) ===== */
+/* ad providers (kept) */
 async function injectAdsense(holder){
-  try{
-    if(!holder) return false;
-    holder.innerHTML = '';
-    const ins = document.createElement('ins');
-    ins.className = 'adsbygoogle';
-    ins.style.display = 'block';
-    ins.style.width = '100%';
-    ins.style.height = '100%';
-    ins.setAttribute('data-ad-client', 'ca-pub-2309008538670900');
-    ins.setAttribute('data-ad-slot', '4194843603');
-    holder.appendChild(ins);
-    try{ (adsbygoogle = window.adsbygoogle || []).push({}); }catch(e){}
-    return true;
-  }catch(e){ return false; }
+  try{ if(!holder) return false; holder.innerHTML=''; const ins=document.createElement('ins'); ins.className='adsbygoogle'; ins.style.display='block'; ins.style.width='100%'; ins.style.height='100%'; ins.setAttribute('data-ad-client','ca-pub-2309008538670900'); ins.setAttribute('data-ad-slot','4194843603'); holder.appendChild(ins); try{ (adsbygoogle=window.adsbygoogle||[]).push({}); }catch(e){} return true;}catch(e){return false;}
 }
-function injectCustomProvider(holder){
-  try{
-    if(!holder) return false;
-    holder.innerHTML = '';
-    const ifr = document.createElement('iframe');
-    ifr.src = CUSTOM_PROVIDER_URL;
-    ifr.style.border = '0';
-    ifr.style.width = '100%';
-    ifr.style.height = '100%';
-    ifr.setAttribute('referrerpolicy','no-referrer');
-    holder.appendChild(ifr);
-    return true;
-  }catch(e){ return false; }
-}
-function injectAdsterra(holder){
-  try{
-    if(!holder) return false;
-    holder.innerHTML = '';
-    const wrap = document.createElement('div');
-    wrap.style.width = '100%'; wrap.style.height = '100%'; wrap.style.display='flex'; wrap.style.alignItems='center'; wrap.style.justifyContent='center';
-    holder.appendChild(wrap);
-    const s1 = document.createElement('script'); s1.type='text/javascript';
-    s1.text = "atOptions = { 'key' : '" + ADSTER_SCRIPT_KEY + "', 'format' : 'iframe', 'height' : 60, 'width' : 468, 'params' : {} };";
-    const s2 = document.createElement('script'); s2.type='text/javascript'; s2.src = ADSTER_SCRIPT_SRC;
-    wrap.appendChild(s1); wrap.appendChild(s2);
-    return true;
-  }catch(e){ return false; }
-}
-function showFallbackVideo(holder){
-  try{
-    if(!holder) return false;
-    holder.innerHTML = '';
-    const v = document.createElement('video');
-    v.src = "https://storage.googleapis.com/interactive-media-ads/media/big_buck_bunny_trailer.mp4";
-    v.autoplay = true; v.muted = true; v.playsInline = true; v.controls = false;
-    v.style.width='100%'; v.style.height='100%';
-    holder.appendChild(v);
-    try{ v.play().catch(()=>{}); }catch(e){}
-    return true;
-  }catch(e){ return false; }
-}
+function injectCustomProvider(holder){ try{ if(!holder) return false; holder.innerHTML=''; const ifr=document.createElement('iframe'); ifr.src=CUSTOM_PROVIDER_URL; ifr.style.border='0'; ifr.style.width='100%'; ifr.style.height='100%'; ifr.setAttribute('referrerpolicy','no-referrer'); holder.appendChild(ifr); return true;}catch(e){return false;} }
+function injectAdsterra(holder){ try{ if(!holder) return false; holder.innerHTML=''; const wrap=document.createElement('div'); wrap.style.width='100%'; wrap.style.height='100%'; wrap.style.display='flex'; wrap.style.alignItems='center'; wrap.style.justifyContent='center'; holder.appendChild(wrap); const s1=document.createElement('script'); s1.type='text/javascript'; s1.text="atOptions = { 'key' : '" + ADSTER_SCRIPT_KEY + "', 'format' : 'iframe', 'height' : 60, 'width' : 468, 'params' : {} };"; const s2=document.createElement('script'); s2.type='text/javascript'; s2.src=ADSTER_SCRIPT_SRC; wrap.appendChild(s1); wrap.appendChild(s2); return true;}catch(e){return false;} }
+function showFallbackVideo(holder){ try{ if(!holder) return false; holder.innerHTML=''; const v=document.createElement('video'); v.src="https://storage.googleapis.com/interactive-media-ads/media/big_buck_bunny_trailer.mp4"; v.autoplay=true; v.muted=true; v.playsInline=true; v.controls=false; v.style.width='100%'; v.style.height='100%'; holder.appendChild(v); try{ v.play().catch(()=>{});}catch(e){} return true;}catch(e){return false;} }
 
-/* ===== compute secs with user mapping & ranges (kept logic) ===== */
+/* computeSecs (kept) */
 function computeSecs(authoritativePayload){
   try{
-    if(authoritativePayload && authoritativePayload.secs && !isNaN(Number(authoritativePayload.secs))){
-      return Number(authoritativePayload.secs);
-    }
+    if(authoritativePayload && authoritativePayload.secs && !isNaN(Number(authoritativePayload.secs))) return Number(authoritativePayload.secs);
     if(authoritativePayload && authoritativePayload.secs_min && authoritativePayload.secs_max){
-      const min = Number(authoritativePayload.secs_min) || 0;
-      const max = Number(authoritativePayload.secs_max) || min;
+      const min = Number(authoritativePayload.secs_min)||0; const max = Number(authoritativePayload.secs_max)||min;
       if(max <= min) return min;
       if(authoritativePayload.user && (authoritativePayload.user.user_id || authoritativePayload.user_id)){
-        const uid = (authoritativePayload.user.user_id || authoritativePayload.user_id);
-        const h = simpleHashToInt(uid);
+        const uid = (authoritativePayload.user.user_id || authoritativePayload.user_id); const h = simpleHashToInt(uid);
         return min + (h % (max - min + 1));
       }
       return Math.floor(Math.random()*(max-min+1)) + min;
     }
     if(authoritativePayload && Array.isArray(authoritativePayload.secs_list) && authoritativePayload.secs_list.length){
       if(authoritativePayload.user && (authoritativePayload.user.user_id || authoritativePayload.user_id)){
-        const uid = (authoritativePayload.user.user_id || authoritativePayload.user_id);
-        const h = simpleHashToInt(uid);
+        const uid = (authoritativePayload.user.user_id || authoritativePayload.user_id); const h = simpleHashToInt(uid);
         return authoritativePayload.secs_list[h % authoritativePayload.secs_list.length];
       }
       return randChoice(authoritativePayload.secs_list);
     }
-    const DURS = [30,40,50,60];
+    const DURS=[30,40,50,60];
     if(authoritativePayload && authoritativePayload.user && (authoritativePayload.user.user_id || authoritativePayload.user_id)){
-      const uid = (authoritativePayload.user.user_id || authoritativePayload.user_id);
-      const h = simpleHashToInt(uid);
+      const uid=(authoritativePayload.user.user_id || authoritativePayload.user_id); const h = simpleHashToInt(uid);
       return DURS[h % DURS.length];
     }
     return randChoice(DURS) || 30;
-  }catch(e){
-    return 30;
-  }
+  }catch(e){ return 30; }
 }
 
-/* ===== ring/progress helpers (defensive) ===== */
+/* ring helpers */
 const ringRadius = 36;
 const ringCirc = 2 * Math.PI * ringRadius;
 function setRingProgress(percent){
@@ -346,124 +277,58 @@ function setRingProgress(percent){
     if(!ring) return;
     const pct = Math.max(0, Math.min(100, Number(percent) || 0));
     const offset = Math.round(ringCirc * (1 - (pct/100)));
-    try{
-      // set as attributes to avoid style string parsing differences
-      ring.setAttribute('stroke-dasharray', String(ringCirc));
-      ring.setAttribute('stroke-dashoffset', String(offset));
-    }catch(e){}
-    const wrap = el('circleWrap');
-    if(wrap && typeof wrap.setAttribute === 'function') wrap.setAttribute('aria-valuenow', String(Math.round(pct)));
-  }catch(e){
-    // swallow errors — keep UI functional
-    console.warn('setRingProgress err', e);
-  }
+    // ensure attributes are set safely (avoid style parsing differences)
+    try{ ring.setAttribute('stroke-dasharray', String(ringCirc)); ring.setAttribute('stroke-dashoffset', String(offset)); }catch(e){}
+    const wrap = el('circleWrap'); if(wrap && typeof wrap.setAttribute === 'function'){ wrap.setAttribute('aria-valuenow', String(Math.round(pct))); }
+  }catch(e){ console.warn('setRingProgress err', e); }
 }
 
-/* ===== core variables ===== */
+/* core state */
 let countdownTimer = null;
 let sessionActive = false;
 let sessionCompleted = false;
 let sessionPayload = null;
 
-/* ===== UI helpers (defensive) ===== */
-function showCircle(){
-  try{
-    const container = el('circleContainer');
-    if(container) container.style.display = 'block';
-    const spinner = el('loaderSpinner');
-    if(spinner && spinner.classList) spinner.classList.remove('hidden');
-    const pt = el('progressText');
-    if(pt) pt.style.display = 'block';
-  }catch(e){}
-}
-function hideCircle(){
-  try{
-    const cw = el('circleWrap');
-    const container = el('circleContainer');
-    if(cw && cw.classList) cw.classList.add('circle-fadeout');
-    // after animation hide
-    setTimeout(()=>{
-      try{
-        if(container) container.style.display = 'none';
-        if(cw && cw.classList) cw.classList.remove('circle-fadeout');
-      }catch(e){}
-    }, 420);
-    const pt = el('progressText');
-    if(pt) pt.style.display = 'none';
-  }catch(e){}
-}
-function showClaimButton(){
-  try{
-    const btn = el('claimBtn');
-    if(!btn) return;
-    btn.disabled = false;
-    // apply pop animation class safely
-    if(!btn.classList.contains('btn-pop')) btn.classList.add('btn-pop');
-    if(!btn.classList.contains('btn-pulse')) btn.classList.add('btn-pulse');
-    btn.style.opacity = '1';
-    btn.style.transform = 'scale(1)';
-    // ensure visible even if container hidden
-    const controls = el('controls');
-    if(controls) controls.classList.remove('hidden');
-    try{ btn.scrollIntoView({behavior:'smooth', block:'center'}); }catch(e){}
-  }catch(e){}
-}
-function hideClaimButton(){
-  try{
-    const btn = el('claimBtn');
-    if(!btn) return;
-    btn.disabled = true;
-    btn.style.opacity='0';
-    if(btn.classList.contains('btn-pulse')) btn.classList.remove('btn-pulse');
-  }catch(e){}
-}
+/* UI helpers */
+function showCircle(){ try{ const container=el('circleContainer'); if(container) container.style.display='block'; const spinner=el('loaderSpinner'); if(spinner) spinner.classList.remove('hidden'); const pt=el('progressText'); if(pt) pt.style.display='block'; }catch(e){} }
+function hideCircle(){ try{ const cw=el('circleWrap'); const container=el('circleContainer'); if(cw && cw.classList) cw.classList.add('circle-fadeout'); setTimeout(()=>{ try{ if(container) container.style.display='none'; if(cw && cw.classList) cw.classList.remove('circle-fadeout'); }catch(e){} },420); const pt=el('progressText'); if(pt) pt.style.display='none'; }catch(e){} }
+function showClaimButton(){ try{ const btn=el('claimBtn'); if(!btn) return; btn.disabled=false; if(!btn.classList.contains('btn-pop')) btn.classList.add('btn-pop'); if(!btn.classList.contains('btn-pulse')) btn.classList.add('btn-pulse'); btn.style.opacity='1'; btn.style.transform='scale(1)'; const controls=el('controls'); if(controls) controls.classList.remove('hidden'); try{ btn.scrollIntoView({behavior:'smooth', block:'center'}); }catch(e){} }catch(e){} }
+function hideClaimButton(){ try{ const btn=el('claimBtn'); if(!btn) return; btn.disabled=true; btn.style.opacity='0'; if(btn.classList.contains('btn-pulse')) btn.classList.remove('btn-pulse'); }catch(e){} }
 
-/* ===== startCountdownAndReport (robust) ===== */
-function startCountdownAndReport(authoritativePayload, source = 'deeplink'){
+/* startCountdownAndReport */
+function startCountdownAndReport(authoritativePayload, source='deeplink'){
   try{
     if(!authoritativePayload || typeof authoritativePayload !== 'object') return;
     try{ sessionStorage.setItem(HOSTED_SESSION_KEY, JSON.stringify(authoritativePayload)); }catch(e){}
-    sessionActive = true;
-    sessionCompleted = false;
-    sessionPayload = authoritativePayload;
+    sessionActive=true; sessionCompleted=false; sessionPayload=authoritativePayload;
 
     const secs = Number(computeSecs(authoritativePayload)) || 30;
-    const ad_id = authoritativePayload.ad_id || authoritativePayload.id || ('host_ad_' + Date.now());
+    const ad_id = authoritativePayload.ad_id || authoritativePayload.id || ('host_ad_'+Date.now());
     const reward = authoritativePayload.reward || authoritativePayload.r || authoritativePayload.base || 0;
 
-    const controls = el('controls');
-    if(controls) controls.classList.remove('hidden');
-    const landing = el('gaingrid-adsense-landing');
-    if(landing) landing.style.display = 'none';
-    const note = el('note');
-    if(note) note.textContent = `Ad: ${ad_id} — preparing ${secs}s`;
-    const countdownEl = el('countdown'); if(countdownEl) countdownEl.textContent = secs;
-    const claimBtn = el('claimBtn'); if(claimBtn) claimBtn.disabled = true;
+    const controls = el('controls'); if(controls) controls.classList.remove('hidden');
+    const landing = el('gaingrid-adsense-landing'); if(landing) landing.style.display='none';
+    const note = el('note'); if(note) note.textContent = `Ad: ${ad_id} — preparing ${secs}s`;
+    const cd = el('countdown'); if(cd) cd.textContent = secs;
+    const claimBtn = el('claimBtn'); if(claimBtn) { claimBtn.disabled=true; claimBtn.style.opacity='0'; claimBtn.style.transform='scale(0.98)'; }
     hideClaimButton();
 
-    try{ if(authoritativePayload.vip_level){ const vip = el('vipInfo'); if(vip) vip.textContent = 'VIP: ' + authoritativePayload.vip_level; } }catch(e){}
+    try{ if(authoritativePayload.vip_level){ const vip=el('vipInfo'); if(vip) vip.textContent='VIP: '+authoritativePayload.vip_level; } }catch(e){}
 
-    // show ad provider
-    (async ()=>{
-      const holder = el('adPlayer');
-      let ok = false;
-      try { ok = await injectAdsense(holder); } catch(e) { ok = false; }
-      if(!ok) ok = injectCustomProvider(holder);
-      if(!ok) ok = injectAdsterra(holder);
-      if(!ok) showFallbackVideo(holder);
-    })();
+    // ad provider
+    (async ()=>{ const holder=el('adPlayer'); let ok=false; try{ ok = await injectAdsense(holder); }catch(e){ ok=false; } if(!ok) ok=injectCustomProvider(holder); if(!ok) ok=injectAdsterra(holder); if(!ok) showFallbackVideo(holder); })();
 
-    // show circle and spinner
+    // show circle only in deeplink flows
     showCircle();
     const spinner = el('loaderSpinner'); if(spinner) spinner.classList.remove('hidden');
-    const circleNumber = el('circleNumber'); if(circleNumber) circleNumber.textContent = '';
+    const circleNumber = el('circleNumber'); if(circleNumber) circleNumber.textContent='';
     setRingProgress(0);
-    const ptext = el('progressText'); if(ptext) ptext.textContent = 'Loading…';
+    const ptext = el('progressText'); if(ptext) ptext.textContent='Loading…';
 
-    // clear existing timer
-    try{ if(countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; } }catch(e){}
+    // clear previous timer safely
+    try{ if(countdownTimer){ clearInterval(countdownTimer); countdownTimer = null; } }catch(e){}
 
-    // small loader delay then start
+    // loader delay then countdown
     setTimeout(()=>{
       try{
         if(spinner) spinner.classList.add('hidden');
@@ -473,174 +338,99 @@ function startCountdownAndReport(authoritativePayload, source = 'deeplink'){
         if(ptext) ptext.textContent = `0 / ${secs}s`;
 
         const startTs = Date.now();
-        // use 250ms ticks but compute elapsed accurately
         countdownTimer = setInterval(()=>{
           try{
             const elapsed = Math.floor((Date.now() - startTs)/1000);
             const pct = Math.min(100, Math.round((elapsed / secs) * 100));
             setRingProgress(pct);
             if(ptext) ptext.textContent = `${elapsed} / ${secs}s`;
-
             const newRemaining = Math.max(0, secs - elapsed);
             if(circleNumber) circleNumber.textContent = String(newRemaining);
-            if(countdownEl) countdownEl.textContent = String(newRemaining);
-
+            if(cd) cd.textContent = String(newRemaining);
             if(newRemaining <= 0){
               try{ clearInterval(countdownTimer); countdownTimer = null; }catch(e){}
-              sessionCompleted = true;
-              sessionActive = false;
+              sessionCompleted=true; sessionActive=false;
               if(note) note.textContent = 'Countdown finished — result posted to webhook.';
-              const result = {
-                ad_id: ad_id,
-                reward: reward,
-                base: authoritativePayload.base || 0,
-                vip_level: authoritativePayload.vip_level || authoritativePayload.vip || null,
-                user: authoritativePayload.user || authoritativePayload.user_id || null,
-                status: 'completed',
-                ts: nowISO(),
-                original_payload: authoritativePayload
-              };
-              // send but don't block UI
-              sendToWebhook(result).then(()=>{/* ok */}).catch(()=>{/* ignore */});
-              // hide circle and show claim
-              try{ hideCircle(); }catch(e){}
-              setTimeout(()=>{ showClaimButton(); if(note) note.textContent = 'Tap Claim to confirm and close.'; }, 320);
+              const result = { ad_id, reward, base: authoritativePayload.base||0, vip_level: authoritativePayload.vip_level||authoritativePayload.vip||null, user: authoritativePayload.user||authoritativePayload.user_id||null, status:'completed', ts: nowISO(), original_payload: authoritativePayload };
+              // send automatically
+              sendToWebhook(result).then(()=>{/*ok*/}).catch(()=>{/*ignore*/});
+              // hide circle, show claim
+              hideCircle();
+              setTimeout(()=>{ showClaimButton(); if(note) note.textContent='Tap Claim to confirm and close.'; }, 320);
             }
-          }catch(inner){
-            console.warn('count tick err', inner);
-          }
+          }catch(inner){ console.warn('tick err', inner); }
         }, 250);
-      }catch(e){
-        console.warn('post-loader start err', e);
-        dbg('count errors');
-      }
+      }catch(e){ console.warn('countdown start err', e); dbg('count errors'); }
     }, 700);
 
-    // manual claim click (defensive)
+    // claim handler
     try{
       const btn = el('claimBtn');
       if(btn){
         btn.onclick = function(){
           try{
             if(btn.disabled) return;
-            btn.disabled = true;
+            btn.disabled=true;
             if(btn.classList.contains('btn-pulse')) btn.classList.remove('btn-pulse');
-            sessionCompleted = true;
-            sessionActive = false;
-            const result = {
-              ad_id: ad_id,
-              reward: reward,
-              base: authoritativePayload.base || 0,
-              vip_level: authoritativePayload.vip_level || authoritativePayload.vip || null,
-              user: authoritativePayload.user || authoritativePayload.user_id || null,
-              status: 'claimed_manual',
-              ts: nowISO(),
-              original_payload: authoritativePayload
-            };
-            sendToWebhook(result).then(()=> { requestCloseHost(); }).catch(()=> { requestCloseHost(); });
+            sessionCompleted=true; sessionActive=false;
+            const result = { ad_id, reward, base: authoritativePayload.base||0, vip_level: authoritativePayload.vip_level||authoritativePayload.vip||null, user: authoritativePayload.user||authoritativePayload.user_id||null, status:'claimed_manual', ts: nowISO(), original_payload: authoritativePayload };
+            sendToWebhook(result).then(()=>{ requestCloseHost(); }).catch(()=>{ requestCloseHost(); });
           }catch(e){ console.warn('claim err', e); }
         };
       }
     }catch(e){}
-  }catch(e){
-    console.warn('startCountdownAndReport err', e);
-    dbg('count err');
-  }
+  }catch(e){ console.warn('start err', e); dbg('count errors'); }
 }
 
-/* ===== sendToWebhook (kept, robust) ===== */
+/* sendToWebhook (keeps loadweb) */
 function sendToWebhook(data){
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve,reject)=>{
     try{
-      const wrapper = { action: 'ads_validate', payload: data, meta: { ts: Date.now(), host: location.href } };
+      const wrapper = { action:'ads_validate', payload:data, meta:{ ts: Date.now(), host: location.href } };
       const body = JSON.stringify(wrapper);
       let sent = false;
       try{
         if(navigator.sendBeacon){
-          try{
-            const blob = new Blob([body], { type: 'application/json' });
-            sent = navigator.sendBeacon(BOT_WEBHOOK, blob);
-          }catch(be){ sent = false; }
+          try{ const blob = new Blob([body], { type:'application/json' }); sent = navigator.sendBeacon(BOT_WEBHOOK, blob); }catch(be){ sent=false; }
         }
-      }catch(e){ sent = false; }
-      if(sent){
-        dbg('webhook sent via beacon: ' + (data.status||''));
-        const note = el('note'); if(note) note.textContent = 'Result posted to webhook.';
-        resolve(true);
-        return;
-      }
-      fetch(BOT_WEBHOOK, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: body, keepalive:true })
-        .then(()=> {
-          dbg('webhook sent fetch: ' + (data.status||''));
-          const note = el('note'); if(note) note.textContent = 'Result posted to webhook.';
-          resolve(true);
-        }).catch((err)=>{
-          dbg('webhook fetch err');
-          const note = el('note'); if(note) note.textContent = 'Failed to post result';
-          resolve(false);
-        });
-    }catch(e){
-      console.warn('sendToWebhook err', e); dbg('webhook err'); const note = el('note'); if(note) note.textContent = 'Failed to post result'; resolve(false);
-    }
+      }catch(e){ sent=false; }
+      if(sent){ dbg('webhook sent via beacon: ' + (data.status||'')); const note=el('note'); if(note) note.textContent='Result posted to webhook.'; resolve(true); return; }
+      fetch(BOT_WEBHOOK, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: body, keepalive:true }).then(()=>{ dbg('webhook sent fetch: ' + (data.status||'')); const note=el('note'); if(note) note.textContent='Result posted to webhook.'; resolve(true); }).catch((err)=>{ dbg('webhook fetch err'); const note=el('note'); if(note) note.textContent='Failed to post result'; resolve(false); });
+    }catch(e){ console.warn('send err', e); dbg('webhook err'); const note=el('note'); if(note) note.textContent='Failed to post result'; resolve(false); }
   });
 }
 
-/* ===== requestCloseHost (kept) ===== */
+/* close request */
 function requestCloseHost(){
   try{
     try{
-      if(window.Telegram && Telegram.WebApp && typeof Telegram.WebApp.close === 'function'){
-        try{ Telegram.WebApp.close(); return; }catch(e){}
-      }
-      if(window.Telegram && window.Telegram.WebApp && typeof window.Telegram.WebApp.close === 'function'){
-        try{ window.Telegram.WebApp.close(); return; }catch(e){}
-      }
+      if(window.Telegram && Telegram.WebApp && typeof Telegram.WebApp.close === 'function'){ try{ Telegram.WebApp.close(); return; }catch(e){} }
+      if(window.Telegram && window.Telegram.WebApp && typeof window.Telegram.WebApp.close === 'function'){ try{ window.Telegram.WebApp.close(); return; }catch(e){} }
     }catch(e){}
-    try{ parent.postMessage({ type: 'close_hosted' }, '*'); }catch(e){}
+    try{ parent.postMessage({ type:'close_hosted' }, '*'); }catch(e){}
     try{ window.close(); }catch(e){}
-    setTimeout(()=>{ try{ parent.postMessage({ type: 'close_hosted' }, '*'); }catch(e){} try{ window.close(); }catch(e){} }, 250);
+    setTimeout(()=>{ try{ parent.postMessage({ type:'close_hosted' }, '*'); }catch(e){} try{ window.close(); }catch(e){} }, 250);
   }catch(err){ console.warn('requestCloseHost err', err); }
 }
 
-/* ===== finalizeAsSkippedIfActive: send ad_skiped ===== */
+/* finalize ad_skiped */
 function finalizeAsSkippedIfActive(reason){
   try{
     if(!sessionActive || sessionCompleted) return;
-    sessionActive = false;
-    sessionCompleted = false;
-    const ad_id = sessionPayload && (sessionPayload.ad_id || sessionPayload.id) ? (sessionPayload.ad_id || sessionPayload.id) : ('host_ad_' + Date.now());
+    sessionActive=false; sessionCompleted=false;
+    const ad_id = sessionPayload && (sessionPayload.ad_id || sessionPayload.id) ? (sessionPayload.ad_id || sessionPayload.id) : ('host_ad_'+Date.now());
     const reward = sessionPayload && (sessionPayload.reward || sessionPayload.base) ? (sessionPayload.reward || sessionPayload.base) : 0;
-    const result = {
-      ad_id: ad_id,
-      reward: reward,
-      base: sessionPayload && sessionPayload.base || 0,
-      vip_level: sessionPayload && (sessionPayload.vip_level || sessionPayload.vip) || null,
-      user: sessionPayload && (sessionPayload.user || sessionPayload.user_id) || null,
-      status: 'ad_skiped',
-      reason: reason || 'user_navigated_or_closed',
-      ts: nowISO(),
-      original_payload: sessionPayload || null
-    };
-    sendToWebhook(result).then(()=>{/* nothing */}).catch(()=>{/* nothing */});
-  }catch(e){ console.warn('finalizeAsSkippedIfActive err', e); }
+    const result = { ad_id, reward, base: sessionPayload && sessionPayload.base||0, vip_level: sessionPayload && (sessionPayload.vip_level||sessionPayload.vip)||null, user: sessionPayload && (sessionPayload.user||sessionPayload.user_id)||null, status:'ad_skiped', reason: reason||'user_navigated_or_closed', ts: nowISO(), original_payload: sessionPayload||null };
+    sendToWebhook(result).then(()=>{/*noop*/}).catch(()=>{/*noop*/});
+  }catch(e){ console.warn('finalize err', e); }
 }
 
-/* ===== lifecycle events (kept) ===== */
-window.addEventListener('beforeunload', function(ev){
-  try{ finalizeAsSkippedIfActive('beforeunload'); }catch(e){}
-});
-window.addEventListener('pagehide', function(ev){
-  try{ finalizeAsSkippedIfActive('pagehide'); }catch(e){}
-});
-document.addEventListener('visibilitychange', function(){
-  try{
-    if(document.visibilityState === 'hidden'){
-      setTimeout(()=> { if(document.visibilityState === 'hidden'){ finalizeAsSkippedIfActive('visibility_hidden'); } }, 1200);
-    }
-  }catch(e){}
-});
+/* lifecycle events */
+window.addEventListener('beforeunload', function(){ try{ finalizeAsSkippedIfActive('beforeunload'); }catch(e){} });
+window.addEventListener('pagehide', function(){ try{ finalizeAsSkippedIfActive('pagehide'); }catch(e){} });
+document.addEventListener('visibilitychange', function(){ try{ if(document.visibilityState==='hidden'){ setTimeout(()=>{ if(document.visibilityState==='hidden'){ finalizeAsSkippedIfActive('visibility_hidden'); } },1200); } }catch(e){} });
 
-/* ===== postMessage listener (kept) ===== */
+/* postMessage listener */
 window.addEventListener('message', function(ev){
   try{
     const d = ev.data || {};
@@ -648,38 +438,24 @@ window.addEventListener('message', function(ev){
     if(d.type === 'start_payload' && d.payload){
       const payload = d.payload;
       let obj = null;
-      if(typeof payload === 'string') obj = tryDecodePayloadString(payload);
-      else obj = payload;
-      if(obj && typeof obj === 'object'){
-        const note = el('note'); if(note) note.textContent = 'PostMessage payload received.';
-        startCountdownAndReport(obj, 'postmessage');
-      }
+      if(typeof payload === 'string') obj = tryDecodePayloadString(payload); else obj = payload;
+      if(obj && typeof obj === 'object'){ const note=el('note'); if(note) note.textContent='PostMessage payload received.'; startCountdownAndReport(obj,'postmessage'); }
       return;
     }
-    if(d.type === 'close_hosted'){
-      try{ window.close(); }catch(e){}
-      return;
-    }
+    if(d.type === 'close_hosted'){ try{ window.close(); }catch(e){} return; }
   }catch(e){ console.warn('message handler err', e); }
 }, false);
 
-/* ===== decode incoming payloads (kept) ===== */
-function getQueryParams(){
-  const s = location.search.replace(/^\?/,''); if(!s) return {};
-  return s.split('&').filter(Boolean).map(p=>{ const i=p.indexOf('='); if(i<0) return [decodeURIComponent(p),'']; return [decodeURIComponent(p.slice(0,i)), decodeURIComponent(p.slice(i+1))]; }).reduce((o,[k,v])=>{ o[k]=v; return o; }, {});
-}
+/* query/hash decode */
+function getQueryParams(){ const s = location.search.replace(/^\?/,''); if(!s) return {}; return s.split('&').filter(Boolean).map(p=>{ const i=p.indexOf('='); if(i<0) return [decodeURIComponent(p),'']; return [decodeURIComponent(p.slice(0,i)), decodeURIComponent(p.slice(i+1))]; }).reduce((o,[k,v])=>{ o[k]=v; return o; }, {}); }
 
-/* ===== boot (kept) ===== */
-function boot(){
+/* boot on DOMContentLoaded to avoid race */
+document.addEventListener('DOMContentLoaded', function(){
   try{
     const qp = getQueryParams();
     if(qp.start){
       const decoded = tryDecodePayloadString(qp.start);
-      if(decoded && typeof decoded === 'object'){
-        const note = el('note'); if(note) note.textContent = 'Deeplink payload received.';
-        startCountdownAndReport(decoded);
-        return;
-      }
+      if(decoded && typeof decoded === 'object'){ const note=el('note'); if(note) note.textContent='Deeplink payload received.'; startCountdownAndReport(decoded); return; }
     }
 
     const hraw = (location.hash || '').replace(/^#/,'');
@@ -689,52 +465,27 @@ function boot(){
         const hashQP = {};
         if(parts[1]) parts[1].split('&').forEach(p=>{ const i=p.indexOf('='); if(i>=0) hashQP[decodeURIComponent(p.slice(0,i))]=decodeURIComponent(p.slice(i+1)); else hashQP[decodeURIComponent(p)]=''; });
         if(path === 'ad' && (hashQP.ad_id || hashQP.id || hashQP.start)){
-          if(hashQP.start){
-            const dec = tryDecodePayloadString(hashQP.start);
-            if(dec && typeof dec === 'object'){ const note = el('note'); if(note) note.textContent = 'Hash path payload (start) received.'; startCountdownAndReport(dec); return; }
-          }
+          if(hashQP.start){ const dec = tryDecodePayloadString(hashQP.start); if(dec && typeof dec === 'object'){ const note=el('note'); if(note) note.textContent='Hash path payload (start) received.'; startCountdownAndReport(dec); return; } }
           const payload = { ad_id: hashQP.ad_id || hashQP.id, secs: hashQP.secs || hashQP.duration, reward: hashQP.reward || hashQP.base, user: { user_id: hashQP.user_id || hashQP.uid || null } };
-          const note = el('note'); if(note) note.textContent = 'Hash path payload received.';
-          startCountdownAndReport(payload);
-          return;
+          const note=el('note'); if(note) note.textContent='Hash path payload received.'; startCountdownAndReport(payload); return;
         }
       } else {
         const decoded = tryDecodePayloadString(decodeURIComponent(hraw));
-        if(decoded && typeof decoded === 'object'){
-          const note = el('note'); if(note) note.textContent = 'Hash base64 payload received.';
-          startCountdownAndReport(decoded);
-          return;
-        }
+        if(decoded && typeof decoded === 'object'){ const note=el('note'); if(note) note.textContent='Hash base64 payload received.'; startCountdownAndReport(decoded); return; }
       }
     }
 
-    try{
-      const sess = sessionStorage.getItem(HOSTED_SESSION_KEY);
-      if(sess){
-        const obj = safeParse(sess);
-        if(obj && typeof obj === 'object'){
-          const note = el('note'); if(note) note.textContent = 'Resumed session (no active countdown).';
-        }
-      }
-    }catch(e){}
+    // fallback session resume (no autorun)
+    try{ const sess = sessionStorage.getItem(HOSTED_SESSION_KEY); if(sess){ const obj = safeParse(sess); if(obj && typeof obj === 'object'){ const note=el('note'); if(note) note.textContent='Resumed session (no active countdown).'; } } }catch(e){}
 
-    const note = el('note'); if(note) note.textContent = 'Public mode — ad area (no controls).';
+    // PUBLIC mode: ensure circle not visible
+    const note = el('note'); if(note) note.textContent='Public mode — ad area (no controls).';
     const controls = el('controls'); if(controls) controls.classList.add('hidden');
-    (async ()=>{
-      const holder = el('adPlayer');
-      let ok = false;
-      try { ok = await injectAdsense(holder); } catch(e) { ok = false; }
-      if(!ok) ok = injectCustomProvider(holder);
-      if(!ok) ok = injectAdsterra(holder);
-      if(!ok) showFallbackVideo(holder);
-    })();
+    const circle = el('circleContainer'); if(circle) circle.style.display = 'none';
+    (async ()=>{ const holder = el('adPlayer'); let ok=false; try{ ok = await injectAdsense(holder); }catch(e){ ok=false; } if(!ok) ok=injectCustomProvider(holder); if(!ok) ok=injectAdsterra(holder); if(!ok) showFallbackVideo(holder); })();
 
   }catch(e){ console.warn('boot err', e); dbg('boot err'); }
-}
-
-/* run */
-boot();
-
+});
 </script>
 </body>
 </html>
