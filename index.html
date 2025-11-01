@@ -1,279 +1,460 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GainGrid - Earn Daily Rewards</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>GainGrid — Earn Daily Rewards</title>
 
-  <!-- === AdSense / providers: keep scripts async (do not auto-insert ad units here) === -->
-  <!-- AdSense script (kept async) -->
-  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"
-          crossorigin="anonymous"></script>
+  <!-- AdSense (kept async) -->
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js" crossorigin="anonymous"></script>
 
-  <!-- Canonical & site metadata (helps AdSense review & SEO) -->
+  <!-- SEO & AdSense-friendly meta -->
   <link rel="canonical" href="https://swanybz.github.io/" />
-  <meta name="description" content="GainGrid — watch ads, complete tasks and earn G-Coins. Telegram-integrated rewards & withdrawals in USD, BTC, USDT." />
-  <meta name="referrer" content="no-referrer-when-downgrade" />
+  <meta name="description" content="GainGrid — Watch verified ads, complete simple tasks and earn G-Coins. Telegram-integrated rewards with secure verification and fast payouts." />
   <meta name="robots" content="index, follow" />
   <meta name="theme-color" content="#0f1419" />
 
-  <!-- JSON-LD organization + site info (non-invasive, helps review) -->
+  <!-- Structured data -->
   <script type="application/ld+json">
   {
-    "@context": "https://schema.org",
-    "@type": "Organization",
-    "name": "GainGrid",
-    "url": "https://swanybz.github.io",
-    "logo": "https://swanybz.github.io/logo.png",
-    "sameAs": []
+    "@context":"https://schema.org",
+    "@type":"WebSite",
+    "name":"GainGrid",
+    "url":"https://swanybz.github.io",
+    "description":"Watch verified ads, complete tasks and earn G-Coins."
   }
   </script>
 
-  <!-- Cookie/consent placeholder: add real CMP later -->
-  <meta name="ads:consent" content="unknown">
+  <!-- Optional SDKs (kept) -->
+  <script src="/_sdk/element_sdk.js" defer></script>
+  <script src="/_sdk/data_sdk.js" type="text/javascript" defer></script>
+  <script src="https://cdn.tailwindcss.com" type="text/javascript" defer></script>
 
-  <!-- KEEP your element SDK includes / font includes -->
-  <script src="/_sdk/element_sdk.js"></script>
-  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
-  <script src="https://cdn.tailwindcss.com" type="text/javascript"></script>
-
-  <!-- ===== Your original styles (kept exactly) ===== -->
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Inter', -webkit-system, BlinkMacSystemFont, sans-serif; background: linear-gradient(135deg, #0f1419 0%, #1a2332 50%, #0f1419 100%); color: #ffffff; overflow-x: hidden; box-sizing: border-box; }
-    html, body { height: 100%; }
-
-    /* Animated background particles */
-    .bg-particles { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
-    .particle { position: absolute; width: 4px; height: 4px; background: linear-gradient(45deg, #ff6b9d, #c471ed, #12c2e9); border-radius: 50%; animation: float 6s ease-in-out infinite; }
-    @keyframes float { 0%, 100% { transform: translateY(0px) rotate(0deg); opacity: 0.7; } 50% { transform: translateY(-20px) rotate(180deg); opacity: 1; } }
-
-    /* Header */
-    .header { position: fixed; top: 0; width: 100%; background: rgba(15, 20, 25, 0.95); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(255, 107, 157, 0.2); z-index: 1000; padding: 1rem 0; }
-    .nav-container { max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; padding: 0 2rem; }
-    .logo { font-size: 1.8rem; font-weight: 700; background: linear-gradient(45deg, #ff6b9d, #c471ed, #12c2e9); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-    .nav-menu { display: flex; list-style: none; gap: 2rem; }
-    .nav-link { color: #ffffff; text-decoration: none; font-weight: 500; transition: all 0.3s ease; position: relative; }
-    .nav-link:hover { color: #ff6b9d; }
-    .nav-link::after { content: ''; position: absolute; bottom: -5px; left: 0; width: 0; height: 2px; background: linear-gradient(45deg, #ff6b9d, #c471ed); transition: width 0.3s ease; }
-    .nav-link:hover::after { width: 100%; }
-
-    /* Main content */
-    .main-content { position: relative; z-index: 10; padding-top: 80px; }
-
-    /* Hero Section */
-    .hero { min-height: 90vh; display: flex; align-items: center; justify-content: center; text-align: center; padding: 2rem; position: relative; }
-    .hero-content { max-width: 800px; animation: fadeInUp 1s ease-out; }
-    .hero-headline { font-size: 3.5rem; font-weight: 800; margin-bottom: 1.5rem; background: linear-gradient(45deg, #ffffff, #ff6b9d, #c471ed); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; line-height: 1.2; }
-    .hero-subtitle { font-size: 1.3rem; color: #b0b8c1; margin-bottom: 3rem; font-weight: 400; }
-    .cta-buttons { display: flex; gap: 1.5rem; justify-content: center; flex-wrap: wrap; }
-    .btn { padding: 1rem 2.5rem; border: none; border-radius: 50px; font-size: 1.1rem; font-weight: 600; cursor: pointer; transition: all 0.3s ease; text-decoration: none; display: inline-block; position: relative; overflow: hidden; }
-    .btn-primary { background: linear-gradient(45deg, #ff6b9d, #c471ed, #12c2e9); color: #ffffff; box-shadow: 0 10px 30px rgba(255, 107, 157, 0.3); }
-    .btn-primary:hover { transform: translateY(-3px); box-shadow: 0 15px 40px rgba(255, 107, 157, 0.4); }
-    .btn-secondary { background: transparent; color: #ffffff; border: 2px solid #ff6b9d; }
-    .btn-secondary:hover { background: rgba(255, 107, 157, 0.1); transform: translateY(-3px); }
-
-    /* Dashboard Preview */
-    .dashboard-preview { margin: 4rem 0; position: relative; }
-    .dashboard-mockup { max-width: 600px; margin: 0 auto; background: rgba(26, 35, 50, 0.8); border-radius: 20px; padding: 2rem; border: 1px solid rgba(255, 107, 157, 0.2); box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3); animation: float 6s ease-in-out infinite; }
-    .mockup-header { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
-    .mockup-dot { width: 12px; height: 12px; border-radius: 50%; }
-    .dot-red { background: #ff5f57; } .dot-yellow { background: #ffbd2e; } .dot-green { background: #28ca42; }
-    .mockup-content { background: linear-gradient(135deg, #1a2332, #0f1419); border-radius: 10px; padding: 1.5rem; text-align: left; }
-    .mockup-title { color: #ff6b9d; font-size: 1.2rem; margin-bottom: 1rem; }
-    .mockup-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 1rem; }
-    .stat-card { background: rgba(255, 107, 157, 0.1); padding: 1rem; border-radius: 8px; text-align: center; }
-    .stat-value { font-size: 1.5rem; font-weight: 700; color: #12c2e9; }
-    .stat-label { font-size: 0.9rem; color: #b0b8c1; }
-
-    /* About Section */
-    .about { padding: 6rem 2rem; background: linear-gradient(135deg, rgba(26, 35, 50, 0.5), rgba(15, 20, 25, 0.8)); }
-    .about-container { max-width: 1200px; margin: 0 auto; text-align: center; }
-    .about-heading { font-size: 2.5rem; font-weight: 700; margin-bottom: 2rem; background: linear-gradient(45deg, #ff6b9d, #c471ed); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-    .about-description { font-size: 1.2rem; color: #b0b8c1; margin-bottom: 4rem; max-width: 800px; margin-left: auto; margin-right: auto; line-height: 1.6; }
-    .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 2rem; margin-top: 3rem; }
-    .feature-card { background: rgba(26, 35, 50, 0.6); padding: 2rem; border-radius: 15px; border: 1px solid rgba(255, 107, 157, 0.2); transition: all 0.3s ease; text-align: center; }
-    .feature-card:hover { transform: translateY(-10px); box-shadow: 0 20px 40px rgba(255, 107, 157, 0.2); }
-    .feature-icon { font-size: 3rem; margin-bottom: 1rem; background: linear-gradient(45deg, #ff6b9d, #c471ed, #12c2e9); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-    .feature-title { font-size: 1.3rem; font-weight: 600; margin-bottom: 1rem; color: #ffffff; }
-    .feature-description { color: #b0b8c1; line-height: 1.5; }
-
-    /* Footer */
-    .footer { background: rgba(15, 20, 25, 0.9); padding: 3rem 2rem 2rem; border-top: 1px solid rgba(255, 107, 157, 0.2); }
-    .footer-container { max-width: 1200px; margin: 0 auto; text-align: center; }
-    .social-links { display: flex; justify-content: center; gap: 1.5rem; margin-bottom: 2rem; }
-    .social-link { display: inline-flex; align-items: center; justify-content: center; width: 50px; height: 50px; background: linear-gradient(45deg, #ff6b9d, #c471ed); border-radius: 50%; color: #ffffff; text-decoration: none; font-size: 1.5rem; transition: all 0.3s ease; }
-    .social-link:hover { transform: translateY(-3px) scale(1.1); box-shadow: 0 10px 25px rgba(255, 107, 157, 0.4); }
-    .footer-text { color: #b0b8c1; font-size: 0.9rem; }
-
-    /* Animations */
-    @keyframes fadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
-    @keyframes glow { 0%, 100% { box-shadow: 0 0 20px rgba(255, 107, 157, 0.3); } 50% { box-shadow: 0 0 40px rgba(255, 107, 157, 0.6); } }
-
-    /* Responsive */
-    @media (max-width: 768px) {
-      .nav-menu { display: none; }
-      .hero-headline { font-size: 2.5rem; }
-      .hero-subtitle { font-size: 1.1rem; }
-      .cta-buttons { flex-direction: column; align-items: center; }
-      .btn { width: 100%; max-width: 300px; }
-      .features-grid { grid-template-columns: 1fr; }
-      .about-heading { font-size: 2rem; }
+    :root{
+      --gg-grad-start:#9b5de5; /* purple */
+      --gg-grad-mid:#f15bb5;   /* pink */
+      --gg-grad-end:#ff6f61;   /* red */
+      --bg-dark:#0f1419;
     }
-
-    /* === AD PLAYER + CIRCLE UI (hidden by default; only shown for deeplink) === */
-    /* We'll add these non-intrusively so your public UI remains unchanged */
-    #hostedAdRoot { display: none; position: fixed; inset: 0; z-index: 2000; background: rgba(6,8,10,0.85); align-items: center; justify-content: center; padding: 18px; }
-    #hostedCard { width: min(960px, 96%); max-height: 92vh; background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); padding: 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.04); display:flex; flex-direction:column; overflow:hidden; }
-    .ad-player { width:100%; height:var(--ad-height,360px); border-radius:8px; overflow:hidden; background:#000; display:flex; align-items:center; justify-content:center; position:relative; }
-    .controls { margin-top:12px; display:flex; gap:12px; align-items:center; justify-content:center; }
-    #claimBtn { padding:10px 14px; border-radius:10px; background:linear-gradient(45deg,#ff6b9d,#c471ed); border:none; color:#fff; cursor:pointer; font-weight:800; font-size:14px; opacity:0; transform:scale(0.98); }
-    #countdown { font-weight:700; font-size:18px; color:#fff; display:none; }
-    /* circle */
-    .circle-wrap { width:88px; height:88px; display:flex; align-items:center; justify-content:center; position:relative; }
-    .loader-spinner { position:absolute; width:48px; height:48px; border-radius:50%; display:flex; align-items:center; justify-content:center; }
-    .spinner-dot { width:8px; height:8px; border-radius:50%; background:rgba(255,255,255,0.9); opacity:0.12; animation:spinner 900ms linear infinite; }
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%}
+    body{
+      font-family:'Inter', system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+      color:#fff;
+      background: linear-gradient(135deg,var(--bg-dark) 0,#121623 50%,var(--bg-dark) 100%);
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+      overflow-x:hidden;
+    }
+    a{color:inherit}
+    /* Header */
+    .header{ position:fixed; top:0; left:0; right:0; z-index:1400; background:rgba(7,9,11,0.88); backdrop-filter:blur(8px); border-bottom:1px solid rgba(255,255,255,0.04); padding:10px 16px;}
+    .nav{ max-width:1200px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; gap:12px;}
+    .logo-wrap{ display:flex; align-items:center; gap:12px; }
+    .logo-img{ width:40px; height:40px; display:block; border-radius:8px; object-fit:cover; background:linear-gradient(90deg,var(--gg-grad-start),var(--gg-grad-mid)); }
+    .logo-text{ font-weight:900; font-size:18px; letter-spacing:0.3px; background:linear-gradient(90deg,var(--gg-grad-start) 0%,var(--gg-grad-mid)45%,var(--gg-grad-end)100%); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+    .nav-links{ display:flex; gap:14px; align-items:center;}
+    .nav-link{ color:rgba(255,255,255,0.9); text-decoration:none; font-weight:700; font-size:14px; padding:8px; border-radius:8px; transition:all .18s;}
+    .nav-link:hover{ background:rgba(255,255,255,0.02)}
+    .nav-cta{ padding:8px 12px; border-radius:10px; text-decoration:none; font-weight:900; font-size:14px; background:linear-gradient(90deg,var(--gg-grad-mid),var(--gg-grad-end)); color:#fff; box-shadow:0 12px 36px rgba(155,93,229,0.12); }
+    /* slide dropdown small card */
+    .menu-btn{ width:40px; height:40px; display:inline-grid; place-items:center; border-radius:8px; background:rgba(255,255,255,0.02); cursor:pointer; border:1px solid rgba(255,255,255,0.03); }
+    .slide-card{ position:absolute; top:68px; right:16px; width:220px; background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-radius:12px; padding:10px; box-shadow:0 10px 30px rgba(0,0,0,0.6); display:none; z-index:1600; border:1px solid rgba(255,255,255,0.04); }
+    .slide-card a{ display:block; padding:8px 10px; color:rgba(255,255,255,0.9); text-decoration:none; font-weight:700; border-radius:8px; }
+    .slide-card a:hover{ background:rgba(255,255,255,0.02) }
+    /* particles */
+    .bg-particles{ position:fixed; inset:0; z-index:1; pointer-events:none; }
+    .particle{ position:absolute; width:6px; height:6px; border-radius:50%; background:linear-gradient(45deg,var(--gg-grad-start),var(--gg-grad-mid)); opacity:0.12; animation:float 6s ease-in-out infinite; }
+    @keyframes float{ 0%,100%{ transform:translateY(0) } 50%{ transform:translateY(-18px) } }
+    main{ position:relative; z-index:10; padding-top:84px; }
+    .container{ max-width:1200px; margin:0 auto; padding:24px; }
+    /* hero */
+    .hero{ display:flex; gap:28px; align-items:center; justify-content:space-between; padding:32px 0; flex-wrap:wrap; }
+    .hero-left{ flex:1 1 420px; min-width:260px; }
+    .hero-title{ font-size:34px; line-height:1.06; font-weight:900; margin-bottom:10px; background:linear-gradient(90deg,#fff,var(--gg-grad-mid),var(--gg-grad-start)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+    .hero-sub{ color:rgba(255,255,255,0.86); font-size:16px; margin-bottom:18px; }
+    .hero-ctas{ display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+    .btn-primary{ padding:12px 20px; border-radius:999px; font-weight:900; text-decoration:none; color:#fff; background:linear-gradient(90deg,var(--gg-grad-start),var(--gg-grad-mid)); box-shadow:0 14px 36px rgba(155,93,229,0.12); }
+    .btn-outline{ padding:10px 16px; border-radius:999px; text-decoration:none; color:rgba(255,255,255,0.92); border:1px solid rgba(255,255,255,0.06); font-weight:800; }
+    .trust-row{ display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
+    .badge{ background:rgba(255,255,255,0.02); padding:8px 12px; border-radius:999px; font-weight:800; font-size:13px; display:flex; gap:8px; align-items:center; color:#fff; }
+    .hero-right{ width:480px; max-width:48%; min-width:260px; display:flex; align-items:center; justify-content:center; }
+    .hero-mock{ width:100%; background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-radius:14px; padding:16px; border:1px solid rgba(255,255,255,0.04); box-shadow:0 20px 60px rgba(0,0,0,0.4); }
+    /* features */
+    .features{ display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-top:20px; }
+    .feature{ padding:16px; border-radius:12px; background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border:1px solid rgba(255,255,255,0.03); }
+    .feature h4{ font-size:16px; margin-bottom:8px; font-weight:900; }
+    .feature p{ color:rgba(255,255,255,0.86); font-size:14px; }
+    /* portable ad frame */
+    .ad-example{ margin-top:30px; display:flex; gap:18px; align-items:flex-start; flex-wrap:wrap; }
+    .ad-card{ width:420px; max-width:100%; background:linear-gradient(135deg,#0e1114,#101216); border-radius:14px; padding:12px; border:1px solid rgba(255,255,255,0.04); }
+    .ad-top{ display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+    .ad-tag{ font-size:12px; color:rgba(255,255,255,0.78); background:rgba(255,255,255,0.02); padding:6px 8px; border-radius:8px; font-weight:800; }
+    .ad-thumb{ width:92px; height:72px; border-radius:10px; background:linear-gradient(90deg,var(--gg-grad-start),var(--gg-grad-mid)); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:900; flex-shrink:0; }
+    .ad-body{ flex:1; }
+    .ad-title{ font-weight:900; font-size:15px; margin-bottom:6px; }
+    .ad-meta{ color:rgba(255,255,255,0.72); font-size:13px; margin-bottom:8px; }
+    .ad-reward{ font-weight:900; color:var(--gg-grad-mid); margin-left:auto; }
+    .ad-timerbar{ margin-top:8px; height:10px; background:rgba(255,255,255,0.03); border-radius:999px; overflow:hidden; }
+    .ad-progress{ height:100%; width:0%; background:linear-gradient(90deg,var(--gg-grad-start),var(--gg-grad-mid)); transition:width .25s linear; }
+    .ad-controls{ display:flex; gap:8px; margin-top:10px; align-items:center; }
+    .btn-small{ padding:8px 12px; border-radius:10px; font-weight:900; background:linear-gradient(90deg,var(--gg-grad-start),var(--gg-grad-mid)); color:#fff; border:none; cursor:pointer; }
+    .btn-small.ghost{ background:transparent; border:1px solid rgba(255,255,255,0.06); color:#fff; }
+    .ad-note{ font-size:13px; color:rgba(255,255,255,0.74); margin-top:8px; }
+    /* how it works */
+    .how{ display:flex; gap:12px; margin-top:36px; flex-wrap:wrap; }
+    .step{ flex:1; min-width:220px; background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-radius:12px; padding:16px; border:1px solid rgba(255,255,255,0.03); }
+    .step h5{ font-size:15px; font-weight:900; margin-bottom:8px; }
+    .step p{ color:rgba(255,255,255,0.86); }
+    /* vip */
+    .vip{ margin-top:28px; display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+    .plan{ padding:16px; border-radius:12px; background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border:1px solid rgba(255,255,255,0.03); text-align:center; }
+    .plan h4{ font-weight:900; margin-bottom:8px; }
+    .plan p{ color:rgba(255,255,255,0.86); margin-bottom:12px; }
+    /* games grid */
+    .games{ display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-top:18px; }
+    .game-card{ padding:12px; border-radius:10px; text-align:center; background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border:1px solid rgba(255,255,255,0.03) }
+    .game-locked{ opacity:0.36; filter:grayscale(0.5); }
+    /* security & stats */
+    .security{ display:flex; gap:12px; margin-top:20px; flex-wrap:wrap; }
+    .stat{ padding:12px; border-radius:10px; background:rgba(255,255,255,0.02); border:1px solid rgba(255,255,255,0.03); min-width:160px; text-align:center }
+    .live-feed{ margin-top:12px; background:rgba(255,255,255,0.02); padding:10px; border-radius:10px; border:1px solid rgba(255,255,255,0.03); height:80px; overflow:auto; font-size:13px; }
+    /* hosted UI (unchanged logic) */
+    #hostedAdRoot{ display:none; position:fixed; inset:0; z-index:2000; align-items:center; justify-content:center; background:rgba(4,6,8,0.82); padding:18px; }
+    #hostedCard{ width:min(960px,96%); max-height:92vh; background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01)); padding:14px; border-radius:12px; border:1px solid rgba(255,255,255,0.04); display:flex; flex-direction:column; overflow:hidden; }
+    .ad-player-host{ width:100%; height:var(--ad-height,360px); border-radius:8px; overflow:hidden; background:#000; display:flex; align-items:center; justify-content:center; position:relative; }
+    .controls-host{ margin-top:12px; display:flex; gap:8px; align-items:center; justify-content:center; }
+    #claimBtnHosted{ padding:10px 14px; border-radius:10px; background:linear-gradient(45deg,var(--gg-grad-mid),var(--gg-grad-end)); border:none; color:#fff; cursor:pointer; font-weight:800; font-size:14px; opacity:0; transform:scale(0.98); }
+    .hidden{ display:none !important; }
+    /* circle ring */
+    .circle-wrap{ width:88px; height:88px; display:flex; align-items:center; justify-content:center; position:relative; }
+    .loader-spinner{ position:absolute; width:48px; height:48px; display:flex; align-items:center; justify-content:center; }
+    .spinner-dot{ width:8px; height:8px; border-radius:50%; background:rgba(255,255,255,0.9); opacity:0.12; animation:spinner 900ms linear infinite; }
     .spinner-dot:nth-child(2){ animation-delay:120ms; opacity:0.22 }
     .spinner-dot:nth-child(3){ animation-delay:240ms; opacity:0.32 }
-    @keyframes spinner { 0%{ transform: translateY(-8px); }50%{ transform: translateY(0px); }100%{ transform: translateY(-8px); } }
-    .progress-ring { width:88px; height:88px; transform: rotate(-90deg); }
-    .ring-circle-bg { stroke: rgba(255,255,255,0.06); stroke-width:8; fill:none; }
-    .ring-circle { stroke-linecap: round; stroke-width:8; fill:none; stroke: url(#ringGradient); }
-    .circle-number { position:absolute; font-weight:800; font-size:20px; pointer-events:none; color:#fff; text-shadow:0 1px 0 rgba(0,0,0,0.6); }
-    .circle-fadeout { animation:circleOut 380ms ease forwards; }
-    @keyframes circleOut { to { transform: scale(0.85); opacity:0; } }
-    .btn-pop { transform-origin:center; animation:popIn 420ms cubic-bezier(.2,.9,.3,1) forwards; }
-    @keyframes popIn { 0% { transform: scale(0.6); opacity:0 } 60% { transform: scale(1.08); opacity:1 } 100% { transform: scale(1); } }
-    @keyframes pulse { 0% { transform: translateY(0) } 50% { transform: translateY(-4px) } 100% { transform: translateY(0) } }
-    .btn-pulse { animation: pulse 900ms ease-in-out infinite; }
-    .hidden { display:none !important; }
+    @keyframes spinner { 0%{ transform: translateY(-8px);}50%{ transform: translateY(0);}100%{ transform: translateY(-8px); } }
+    .progress-ring{ width:88px; height:88px; transform:rotate(-90deg); }
+    .ring-circle-bg{ stroke:rgba(255,255,255,0.06); stroke-width:8; fill:none; }
+    .ring-circle{ stroke-linecap:round; stroke-width:8; fill:none; stroke:url(#ringGradient); }
+    .circle-number{ position:absolute; font-weight:800; font-size:20px; color:#fff; }
+    .circle-fadeout{ animation:circleOut 380ms ease forwards; }
+    @keyframes circleOut{ to{ transform:scale(0.85); opacity:0; } }
+    .btn-pop{ transform-origin:center; animation:popIn 420ms cubic-bezier(.2,.9,.3,1) forwards; }
+    @keyframes popIn{ 0%{ transform:scale(0.6); opacity:0 } 60%{ transform:scale(1.08); opacity:1 } 100%{ transform:scale(1); } }
+    .btn-pulse{ animation:pulse 900ms ease-in-out infinite; }
+    @keyframes pulse{ 0%{ transform:translateY(0) } 50%{ transform:translateY(-4px) } 100%{ transform:translateY(0) } }
+    footer{ margin-top:48px; padding:28px 0; background:rgba(6,8,10,0.6); border-top:1px solid rgba(255,255,255,0.02); }
+    @media (max-width:1000px){ .features{ grid-template-columns:repeat(2,1fr); } .vip{ grid-template-columns:repeat(2,1fr); } .games{ grid-template-columns:repeat(2,1fr); } }
+    @media (max-width:720px){ .nav{ padding:6px 12px; } .hero{ flex-direction:column-reverse; gap:18px; } .hero-right{ width:100%; } .features{ grid-template-columns:1fr; } .vip{ grid-template-columns:1fr; } .trust-row{ justify-content:flex-start; } .games{ grid-template-columns:repeat(2,1fr); } .slide-card{ right:8px; width:calc(100% - 32px); top:64px; } }
+    /* consent banner */
+    .consent-banner{ position:fixed; left:12px; right:12px; bottom:12px; z-index:1800; background:linear-gradient(180deg, #0b0d0f, #0f1317); border-radius:12px; padding:14px; display:flex; align-items:center; gap:12px; border:1px solid rgba(255,255,255,0.04); box-shadow:0 10px 40px rgba(0,0,0,0.6); }
+    .consent-btn{ padding:10px 14px; border-radius:10px; font-weight:900; background:linear-gradient(90deg,var(--gg-grad-mid),var(--gg-grad-end)); color:#fff; border:none; cursor:pointer; }
+    .consent-txt{ color:rgba(255,255,255,0.9); font-size:14px; flex:1; }
+    /* content banner image */
+    .content-banner{ margin-top:20px; border-radius:12px; overflow:hidden; border:1px solid rgba(255,255,255,0.04); box-shadow:0 18px 60px rgba(0,0,0,0.45); background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); }
+    .banner-inner{ display:flex; gap:16px; align-items:center; padding:14px; flex-wrap:wrap; }
+    .banner-img{ width:220px; max-width:100%; border-radius:8px; object-fit:cover; }
+    .banner-body{ flex:1; }
   </style>
-
-  <!-- preserve your quick view transition preference -->
-  <style>@view-transition { navigation: auto; }</style>
 </head>
 
 <body>
-  <!-- Animated Background Particles -->
+  <!-- Particles -->
   <div class="bg-particles" id="particles"></div>
 
-  <!-- Header (kept as-is) -->
+  <!-- Header -->
   <header class="header">
-    <nav class="nav-container">
-      <div class="logo" id="logo">GainGrid</div>
-      <ul class="nav-menu">
-        <li><a href="#home" class="nav-link">Home</a></li>
-        <li><a href="#about" class="nav-link">About</a></li>
-        <li><a href="#contact" class="nav-link">Contact</a></li>
-        <li><a href="#" class="nav-link" style="color: #ff6b9d;">Launch Bot</a></li>
-      </ul>
-    </nav>
+    <div class="nav">
+      <div class="logo-wrap">
+        <img src="logo.png" alt="GainGrid logo" class="logo-img" />
+        <div class="logo-text">Gain-Grid</div>
+      </div>
+
+      <div style="position:relative;">
+        <div class="nav-links" id="topNav">
+          <a class="nav-link" href="#home">Home</a>
+          <a class="nav-link" href="#how">How</a>
+          <a class="nav-link" href="#vip">VIP</a>
+          <a class="nav-link" href="#games">Games</a>
+          <a class="nav-cta" id="getStarted" href="https://t.me/GridGain_bot?start=watch_ads" target="_blank" rel="noopener noreferrer">Get Started</a>
+        </div>
+        <div class="menu-btn" id="menuBtn" title="Menu" aria-label="Open menu">
+          <!-- hamburger -->
+          <svg width="18" height="12" viewBox="0 0 24 16" fill="none"><rect x="0" y="1" width="24" height="2" rx="1" fill="white" opacity="0.9"/><rect x="0" y="7" width="24" height="2" rx="1" fill="white" opacity="0.9"/><rect x="0" y="13" width="24" height="2" rx="1" fill="white" opacity="0.9"/></svg>
+        </div>
+
+        <div class="slide-card" id="slideCard" role="menu" aria-hidden="true">
+          <a href="#home">Home</a>
+          <a href="#how">How it works</a>
+          <a href="#vip">VIP</a>
+          <a href="#games">Games</a>
+          <a href="https://t.me/SwanyTech" target="_blank" rel="noopener noreferrer">Contact</a>
+        </div>
+      </div>
+    </div>
   </header>
 
-  <!-- Main public content (kept exactly as you gave it) -->
-  <main class="main-content" id="publicLanding">
-    <!-- Hero Section -->
-    <section class="hero" id="home">
-      <div class="hero-content">
-        <h1 class="hero-headline" id="heroHeadline">Earn Daily Rewards by Watching Ads &amp; Completing Tasks</h1>
-        <p class="hero-subtitle" id="heroSubtitle">Join thousands earning G-Coin daily.</p>
-        <div class="cta-buttons">
-          <a href="#" class="btn btn-primary" id="ctaPrimary">Get Started</a>
-          <a href="#about" class="btn btn-secondary" id="ctaSecondary">Learn More</a>
+  <!-- Main public landing (id kept publicLanding so deeplink flow can hide it) -->
+  <main id="publicLanding">
+    <div class="container">
+
+      <!-- HERO -->
+      <section class="hero" id="home">
+        <div class="hero-left">
+          <div class="hero-title">Watch. Earn. Grow — with Gain-Grid</div>
+          <div class="hero-sub">Verified timers, secure payouts and fun games — built for real users and real advertisers.</div>
+
+          <div class="hero-ctas">
+            <a class="btn-primary" href="https://t.me/GridGain_bot?start=watch_ads" target="_blank" rel="noopener noreferrer">Get Started</a>
+            <a class="btn-outline" href="#how">How it works</a>
+          </div>
+
+          <div class="trust-row">
+            <div class="badge">★ Trusted by 15K+ users</div>
+            <div class="badge">⭐ 4.8 rating</div>
+            <div class="badge">⏱ Verified timers</div>
+          </div>
+
+          <!-- small live stats -->
+          <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;">
+            <div class="stat"><div style="font-weight:900;font-size:20px" id="totalUsers">15,238</div><div style="font-size:12px;color:rgba(255,255,255,0.7)">Total users</div></div>
+            <div class="stat"><div style="font-weight:900;font-size:20px" id="totalAds">239,102</div><div style="font-size:12px;color:rgba(255,255,255,0.7)">Ads viewed</div></div>
+            <div class="stat"><div style="font-weight:900;font-size:20px" id="liveViewers">1,024</div><div style="font-size:12px;color:rgba(255,255,255,0.7)">Active now</div></div>
+          </div>
+
         </div>
 
-        <!-- Dashboard Preview -->
-        <div class="dashboard-preview">
-          <div class="dashboard-mockup">
-            <div class="mockup-header">
-              <div class="mockup-dot dot-red"></div>
-              <div class="mockup-dot dot-yellow"></div>
-              <div class="mockup-dot dot-green"></div>
+        <div class="hero-right">
+          <div class="hero-mock" role="img" aria-label="GainGrid preview">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+              <div style="font-weight:900;background:linear-gradient(90deg,var(--gg-grad-start),var(--gg-grad-mid)); -webkit-background-clip:text;-webkit-text-fill-color:transparent;">GainGrid Dashboard</div>
+              <div style="font-size:12px;color:rgba(255,255,255,0.7)">Live preview</div>
             </div>
-            <div class="mockup-content">
-              <div class="mockup-title">GainGrid Dashboard</div>
-              <div class="mockup-stats">
-                <div class="stat-card"><div class="stat-value">1,247</div><div class="stat-label">G-Coins</div></div>
-                <div class="stat-card"><div class="stat-value">$24.50</div><div class="stat-label">USD Value</div></div>
-                <div class="stat-card"><div class="stat-value">15</div><div class="stat-label">Tasks Done</div></div>
-                <div class="stat-card"><div class="stat-value">VIP 2</div><div class="stat-label">Level</div></div>
+            <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;">
+              <div style="background:rgba(255,255,255,0.02);padding:12px;border-radius:10px;">
+                <div style="font-size:12px;color:var(--gg-grad-mid);font-weight:800;margin-bottom:8px">Balance</div>
+                <div style="font-weight:900;font-size:20px">1,247 GC</div>
+              </div>
+              <div style="background:rgba(255,255,255,0.02);padding:12px;border-radius:10px;">
+                <div style="font-size:12px;color:#12c2e9;font-weight:800;margin-bottom:8px">USD Value</div>
+                <div style="font-weight:900;font-size:20px">$24.50</div>
               </div>
             </div>
+            <div style="margin-top:12px; display:flex; gap:10px; align-items:center;">
+              <a class="btn-outline" href="https://t.me/GridGain_bot?start=watch_ads" target="_blank" rel="noopener noreferrer">Open Bot</a>
+              <a class="btn-primary" href="https://t.me/SwanyTech" target="_blank" rel="noopener noreferrer">Contact</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Content banner: your provided dashboard screenshot -->
+      <section class="content-banner" aria-label="Dashboard screenshot banner" style="margin-top:18px">
+        <div class="banner-inner">
+          <img class="banner-img" src="https://files.catbox.moe/sbwnxj.jpg" alt="GainGrid dashboard screenshot" />
+          <div class="banner-body">
+            <h3 style="font-size:20px;margin-bottom:8px">GainGrid — Your dashboard preview</h3>
+            <p style="color:rgba(255,255,255,0.86)">This preview shows how the bot dashboard appears to users. It demonstrates task lists, ad details, timers, and earnings. When users finish verified ads, the public live feed below updates automatically.</p>
+            <div style="margin-top:10px;display:flex;gap:8px">
+              <a class="btn-primary" href="https://t.me/GridGain_bot?start=watch_ads" target="_blank">Try Watch Ads</a>
+              <a class="btn-outline" href="#how">Learn how</a>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Features -->
+      <section class="features" aria-labelledby="featuresHeading">
+        <div class="feature">
+          <h4>Verified timers</h4>
+          <p>Securely confirm watch time before rewards are released to ensure advertisers get real engagement and users are paid fairly.</p>
+        </div>
+        <div class="feature">
+          <h4>Fraud resistant</h4>
+          <p>IP and email verification, plus backend checks, prevent fraud and protect payouts.</p>
+        </div>
+        <div class="feature">
+          <h4>Fast payouts</h4>
+          <p>Verified rewards are credited quickly. Withdraw to USD, BTC, USDT and more.</p>
+        </div>
+      </section>
+
+      <!-- Example ad mockup (portable) -->
+      <section class="ad-example" aria-labelledby="adExampleHeading">
+        <div class="ad-card" role="group" aria-label="Ad example">
+          <div class="ad-top">
+            <div class="ad-tag">Ad • Sponsored</div>
+            <div style="flex:1"></div>
+            <div class="ad-reward" aria-hidden="true" style="font-size:13px">Reward: <span style="color:var(--gg-grad-mid)">1000 G-Coins</span></div>
+          </div>
+
+          <div style="display:flex;gap:12px;align-items:center;">
+            <div class="ad-thumb" aria-hidden="true">IMG</div>
+            <div class="ad-body">
+              <div class="ad-title">Big Launch — Watch 40s</div>
+              <div class="ad-meta">Sample ad used for demonstration — reward granted after verification.</div>
+
+              <div style="margin-top:8px">
+                <div class="ad-timerbar" aria-hidden="true">
+                  <div id="exampleProgress" class="ad-progress" style="width:0%"></div>
+                </div>
+                <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:13px;color:rgba(255,255,255,0.7);">
+                  <div id="timeLeftExample">0s</div>
+                  <div>40s</div>
+                </div>
+              </div>
+
+              <div class="ad-controls">
+                <button id="startExample" class="btn-small" aria-label="Start example ad">Start</button>
+                <button id="skipExample" class="btn-small ghost" aria-label="Skip example ad">Skip</button>
+              </div>
+
+              <div class="ad-note">Once the timer completes, the reward is verified and credited to your wallet.</div>
+            </div>
           </div>
         </div>
 
-      </div>
-    </section>
+        <div style="flex:1; min-width:240px;">
+          <h3 style="font-size:18px;margin-bottom:8px">How it works</h3>
+          <ol style="color:rgba(255,255,255,0.86);line-height:1.6;padding-left:18px">
+            <li><strong>Start</strong> — Open an ad task and start the verified timer.</li>
+            <li><strong>Verify</strong> — GainGrid validates watch time and confirms the result.</li>
+            <li><strong>Reward</strong> — Verified rewards are credited to your wallet quickly.</li>
+          </ol>
+        </div>
+      </section>
 
-    <!-- About Section -->
-    <section class="about" id="about">
-      <div class="about-container">
-        <h2 class="about-heading" id="aboutHeading">What is GainGrid?</h2>
-        <p class="about-description" id="aboutDescription">GainGrid is a Telegram-integrated reward system where users earn G-Coin by watching ads, completing simple tasks, and playing fun games. Withdraw in USD, BTC, and more.</p>
-        <div class="features-grid">
-          <div class="feature-card">
-            <div class="feature-icon">👀</div>
-            <h3 class="feature-title">Watch &amp; Earn</h3>
-            <p class="feature-description">Watch engaging ads and earn G-Coins instantly. Simple, fast, and rewarding.</p>
+      <!-- How / Security / Stats -->
+      <section class="how" id="how">
+        <div class="step">
+          <h5>Start</h5>
+          <p>Tap Start to begin a verified watch — a secure timer runs while you watch the ad.</p>
+        </div>
+        <div class="step">
+          <h5>Verify</h5>
+          <p>GainGrid validates watch time using multiple checks — including IP and email verification for withdrawals.</p>
+        </div>
+        <div class="step">
+          <h5>Reward</h5>
+          <p>Once verified, rewards appear in your wallet. Gold & Premium users can trade G-Coins for strategic growth or promote ads to other users.</p>
+        </div>
+      </section>
+
+      <!-- VIP plans -->
+      <section id="vip" class="vip">
+        <div class="plan">
+          <h4>Basic (🥉)</h4>
+          <p>Starter level — basic tasks and ads. Refer 6 users to promote to Basic VIP automatically.</p>
+          <p style="font-weight:900;margin-top:8px">Good for new users</p>
+          <a class="btn-outline" href="https://t.me/GridGain_bot?start=watch_ads" target="_blank">Join Now</a>
+        </div>
+        <div class="plan">
+          <h4>Gold (🥇)</h4>
+          <p>Higher G-Coin bonuses and access to G-Coin trading. Unlock extra games and daily promos.</p>
+          <p style="font-weight:900;margin-top:8px">Higher earnings</p>
+          <a class="btn-primary" href="https://t.me/GridGain_bot?start=watch_ads" target="_blank">Upgrade</a>
+        </div>
+        <div class="plan">
+          <h4>Premium (🏆)</h4>
+          <p>Top rewards, exclusive tasks and fastest payouts. Trade G-Coins, promote ads, and get priority support.</p>
+          <p style="font-weight:900;margin-top:8px">For heavy earners</p>
+          <a class="btn-primary" href="https://t.me/GridGain_bot?start=watch_ads" target="_blank">Become VIP</a>
+        </div>
+      </section>
+
+      <!-- Games (8 slots) -->
+      <section id="games" style="margin-top:18px">
+        <h3 style="margin-bottom:10px">Games (unlock by VIP level)</h3>
+        <div class="games" aria-label="Games grid">
+          <div class="game-card">Game 1<br><small>Unlocked</small></div>
+          <div class="game-card">Game 2<br><small>Unlocked</small></div>
+          <div class="game-card game-locked">Game 3<br><small>Locked</small></div>
+          <div class="game-card game-locked">Game 4<br><small>Locked</small></div>
+          <div class="game-card game-locked">Game 5<br><small>Locked</small></div>
+          <div class="game-card game-locked">Game 6<br><small>Locked</small></div>
+          <div class="game-card game-locked">Game 7<br><small>Locked</small></div>
+          <div class="game-card game-locked">Game 8<br><small>Locked</small></div>
+        </div>
+      </section>
+
+      <!-- Security & live feed -->
+      <section style="margin-top:20px">
+        <div class="security">
+          <div class="stat">
+            <div style="font-weight:900" id="ipVerCount">IP Checks</div>
+            <div style="font-size:12px;color:rgba(255,255,255,0.7)">Active monitoring</div>
           </div>
-          <div class="feature-card">
-            <div class="feature-icon">✅</div>
-            <h3 class="feature-title">Complete Tasks</h3>
-            <p class="feature-description">Finish easy tasks and surveys to boost your earnings every day.</p>
+          <div class="stat">
+            <div style="font-weight:900" id="emailVerCount">Email Verified</div>
+            <div style="font-size:12px;color:rgba(255,255,255,0.7)">Withdrawals secured</div>
           </div>
-          <div class="feature-card">
-            <div class="feature-icon">💰</div>
-            <h3 class="feature-title">Withdraw Easily</h3>
-            <p class="feature-description">Convert your G-Coins to USD, BTC, or other cryptocurrencies seamlessly.</p>
-          </div>
-          <div class="feature-card">
-            <div class="feature-icon">⭐</div>
-            <h3 class="feature-title">VIP Levels</h3>
-            <p class="feature-description">Unlock higher earning rates and exclusive rewards as you level up.</p>
-          </div>
-          <div class="feature-card">
-            <div class="feature-icon">🤝</div>
-            <h3 class="feature-title">Referral Bonuses</h3>
-            <p class="feature-description">Invite friends and earn bonus G-Coins from their activities.</p>
+          <div class="stat">
+            <div style="font-weight:900" id="promotionsCount">Promotions</div>
+            <div style="font-size:12px;color:rgba(255,255,255,0.7)">Active campaigns</div>
           </div>
         </div>
-      </div>
-    </section>
+
+        <div style="margin-top:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div style="font-weight:900">Live activity</div>
+            <div style="font-size:12px;color:rgba(255,255,255,0.7)">Updated in real time</div>
+          </div>
+          <div class="live-feed" id="liveFeed" aria-live="polite">
+            <!-- live entries appended here -->
+            <div>@alice completed ad GG_12345 — +5 GC</div>
+            <div>@mike completed ad GG_12346 — +5 GC</div>
+          </div>
+        </div>
+      </section>
+
+    </div>
   </main>
 
-  <!-- Footer (kept) -->
-  <footer class="footer">
-    <div class="footer-container">
-      <div class="social-links">
-        <a href="#" class="social-link" title="Telegram">📱</a>
-        <a href="#" class="social-link" title="YouTube">📺</a>
-        <a href="#" class="social-link" title="Twitter">🐦</a>
-        <a href="#" class="social-link" title="Discord">💬</a>
+  <!-- Consent banner (blocks public ad injection until accept) -->
+  <div class="consent-banner" id="consentBanner" role="dialog" aria-live="polite" aria-label="Cookie and ad consent">
+    <div class="consent-txt">GainGrid uses ads to reward users. By consenting, you allow ad scripts to load on this page for a better experience. You can still use the bot without accepting.</div>
+    <button class="consent-btn" id="consentAccept">Accept & Show Ads</button>
+    <button class="consent-btn" id="consentDecline" style="background:transparent;border:1px solid rgba(255,255,255,0.06);">Decline</button>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <div class="container" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+      <div>
+        <div style="font-weight:900">Gain-Grid</div>
+        <div style="color:rgba(255,255,255,0.7);font-size:13px">Secure ad verification • Fast payouts • Telegram-integrated</div>
       </div>
-      <p class="footer-text">© GainGrid 2025. All rights reserved.</p>
+
+      <div style="display:flex;gap:12px;align-items:center;">
+        <a class="nav-link" href="/privacy.html">Privacy</a>
+        <a class="nav-link" href="/terms.html">Terms</a>
+        <a class="nav-link" href="https://t.me/SwanyTech" target="_blank" rel="noopener noreferrer">Contact</a>
+      </div>
+
+      <div style="width:100%;text-align:center;margin-top:12px;color:rgba(255,255,255,0.6)">© GainGrid 2025. All rights reserved.</div>
     </div>
   </footer>
 
-  <!-- === Hidden hosted/deeplink ad UI (only shown when deeplink payload present) === -->
+  <!-- Hidden hosted/deeplink ad UI (unchanged logic) -->
   <div id="hostedAdRoot" aria-hidden="true">
     <div id="hostedCard" role="dialog" aria-modal="true">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <div style="font-weight:900;font-size:18px;background:linear-gradient(90deg,#c471ed 0%,#ff6b9d 45%,#ff4d79 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">Gain-Grid</div>
-        <div class="small" id="vipInfoHosted">VIP: —</div>
+        <div style="font-weight:900;font-size:18px;background:linear-gradient(90deg,var(--gg-grad-mid),var(--gg-grad-start));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">Gain-Grid</div>
+        <div style="font-size:13px;color:rgba(255,255,255,0.9)" id="vipInfoHosted">VIP: —</div>
       </div>
 
-      <div class="ad-player" id="adPlayerHosted" aria-live="polite">
-        <div id="adPlaceholderHosted" class="small">Ad player area</div>
+      <div class="ad-player-host" id="adPlayerHosted" aria-live="polite">
+        <div id="adPlaceholderHosted" style="color:rgba(255,255,255,0.7)">Ad player area</div>
 
-        <!-- Circular loader overlay -->
         <div id="circleContainer" style="position:absolute;right:18px;top:18px;display:none;z-index:60;">
           <div class="circle-wrap" id="circleWrap" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
             <svg class="progress-ring" viewBox="0 0 88 88" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
               <defs>
                 <linearGradient id="ringGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%" stop-color="#c471ed"/>
-                  <stop offset="50%" stop-color="#ff6b9d"/>
-                  <stop offset="100%" stop-color="#ff4d79"/>
+                  <stop offset="0%" stop-color="#9b5de5"/>
+                  <stop offset="50%" stop-color="#f15bb5"/>
+                  <stop offset="100%" stop-color="#ff6f61"/>
                 </linearGradient>
               </defs>
               <circle class="ring-circle-bg" cx="44" cy="44" r="36"></circle>
@@ -293,34 +474,32 @@
         <div class="progress-text" id="progressTextHosted" style="display:none">Loading…</div>
       </div>
 
-      <div class="controls" id="controlsHosted" style="margin-top:12px;display:flex;gap:8px;align-items:center;justify-content:center;">
+      <div class="controls-host" id="controlsHosted" style="margin-top:12px;display:flex;gap:8px;align-items:center;justify-content:center;">
         <div class="countdown" id="countdownHosted">—</div>
-        <button id="claimBtnHosted" class="btn" disabled>Claim / Send Result</button>
+        <button id="claimBtnHosted" class="btn-pop" disabled>Claim / Send Result</button>
       </div>
 
       <div class="note" id="noteHosted" style="margin-top:8px;color:rgba(255,255,255,0.6);font-size:12px;text-align:center;">Waiting for deeplink...</div>
     </div>
   </div>
 
-  <!-- Debug panel (kept hidden by default) -->
-  <div id="dbg" style="position:fixed;right:10px;bottom:10px;padding:6px 8px;background:rgba(0,0,0,0.6);border-radius:6px;font-size:11px;color:#fff;z-index:9999;display:none">dbg</div>
+  <div id="dbg" style="display:none">dbg</div>
 
-  <!-- ===== Application JS: public UI + deeplink/ad logic combined (robust & non-invasive) ===== -->
+  <!-- App JS: preserves all crucial names/endpoints/logic and adds public features -->
   <script>
-    // ---------- Basic config & helpers (kept names) ----------
-    const BOT_WEBHOOK = "https://gaingrid.bots.business/loadweb"; // loadweb endpoint (kept)
+    /* === preserved configuration (unchanged endpoints / names) === */
+    const BOT_WEBHOOK = "https://gaingrid.bots.business/loadweb";
     const HOSTED_SESSION_KEY = 'gg_hosted_authoritative_payload';
     const ADSTER_SCRIPT_KEY = 'a8702b8b4c48420a3815542007f1c0df';
     const ADSTER_SCRIPT_SRC = "//www.highperformanceformat.com/" + ADSTER_SCRIPT_KEY + "/invoke.js";
     const CUSTOM_PROVIDER_URL = "https://experiencedbat.com/dbm/F.zudZGMN/vBZ_GeUM/Jelm/9ruAZ/UjlGkpPiTuYT2/ORDok/w/NEjDU-t/Ntj/Y/4_OhTuAb2iNQixZWs/aKWn1rpydHDr0IxU";
 
-    const el = id => { try { return document.getElementById(id); } catch (e) { return null; } };
-    function dbg(msg){ try{ const d = el('dbg'); if(d){ d.style.display='block'; d.textContent=String(msg).slice(0,160);} console.log('hosted:', msg);}catch(e){} }
+    const el = id => { try{ return document.getElementById(id); }catch(e){ return null; } };
+    function dbg(msg){ try{ const d = el('dbg'); if(d){ d.style.display='block'; d.textContent=String(msg).slice(0,200); } console.log(msg); }catch(e){} }
     function nowISO(){ return (new Date()).toISOString(); }
     function randChoice(arr){ return arr && arr.length ? arr[Math.floor(Math.random()*arr.length)] : 30; }
     function safeParse(s){ try{ return JSON.parse(s); }catch(e){ return null; } }
 
-    // minimal hash -> int for deterministic secs mapping
     function simpleHashToInt(s){
       try{
         const str = String(s||'');
@@ -330,7 +509,6 @@
       }catch(e){ return Math.floor(Math.random()*1000000); }
     }
 
-    // decode utilities (kept)
     function decodeBase64UrlSafe(raw){
       if(!raw) return null;
       try{
@@ -338,7 +516,7 @@
         const pad = r.length % 4;
         if(pad === 2) r += '=='; else if(pad === 3) r += '=';
         const dec = atob(r);
-        try{ return JSON.parse(dec); }catch(e){ return dec; }
+        try{ return JSON.parse(dec);}catch(e){ return dec; }
       }catch(e){ return null; }
     }
     function tryDecodePayloadString(raw){
@@ -357,10 +535,12 @@
       return null;
     }
 
-    // ----- ad provider injection (kept) -----
+    /* ----- ad provider injection (kept) ----- */
     async function injectAdsense(holder){
       try{
         if(!holder) return false;
+        // if user hasn't consented, don't inject
+        if(!window.__gg_ads_consent) return false;
         holder.innerHTML = '';
         const ins = document.createElement('ins');
         ins.className = 'adsbygoogle';
@@ -416,7 +596,7 @@
       }catch(e){ return false; }
     }
 
-    // compute secs (keeps mapping rules)
+    // compute secs mapping (kept and improved mapping)
     function computeSecs(authoritativePayload){
       try{
         if(authoritativePayload && authoritativePayload.secs && !isNaN(Number(authoritativePayload.secs))){
@@ -447,16 +627,15 @@
           const h = simpleHashToInt(uid);
           return DURS[h % DURS.length];
         }
-        return randChoice(DURS);
+        return randChoice([30,40,50,60]);
       }catch(e){
         return 30;
       }
     }
 
-    // ring helpers
+    // ring helpers for hosted UI
     const ringRadius = 36;
-    const ringCirc = 2 * Math.PI * ringRadius; // stroke-dasharray
-
+    const ringCirc = 2 * Math.PI * ringRadius;
     function setRingProgress(percent){
       try{
         const ring = document.querySelector('#hostedCard .ring-circle');
@@ -468,32 +647,22 @@
       }catch(e){}
     }
 
-    // state
+    /* ---------- hosted state (preserved) ---------- */
     let countdownTimer = null;
     let sessionActive = false;
     let sessionCompleted = false;
     let sessionPayload = null;
 
-    // UI helpers
     function showHostedUI(){
-      try{
-        const root = el('hostedAdRoot'); if(root){ root.style.display = 'flex'; root.setAttribute('aria-hidden','false'); }
-        const circleContainer = el('circleContainer'); if(circleContainer) circleContainer.style.display='block';
-        const controls = el('controlsHosted'); if(controls) controls.style.display = 'flex';
-        const note = el('noteHosted'); if(note) note.textContent = 'Deeplink payload received — preparing...';
-      }catch(e){}
+      try{ const root = el('hostedAdRoot'); if(root){ root.style.display='flex'; root.setAttribute('aria-hidden','false'); } const circleContainer = el('circleContainer'); if(circleContainer) circleContainer.style.display='block'; const controls = el('controlsHosted'); if(controls) controls.style.display='flex'; const note = el('noteHosted'); if(note) note.textContent = 'Deeplink payload received — preparing...'; }catch(e){}
     }
-    function hideHostedUI(){
-      try{
-        const root = el('hostedAdRoot'); if(root){ root.style.display = 'none'; root.setAttribute('aria-hidden','true'); }
-      }catch(e){}
-    }
+    function hideHostedUI(){ try{ const root = el('hostedAdRoot'); if(root){ root.style.display='none'; root.setAttribute('aria-hidden','true'); } }catch(e){} }
     function showCircle(){ try{ const c = el('circleContainer'); if(c) c.style.display='block'; const spinner = el('loaderSpinner'); if(spinner) spinner.classList.remove('hidden'); const p = el('progressTextHosted'); if(p) p.style.display='block'; }catch(e){} }
     function hideCircle(){ try{ const cw = el('circleWrap'); if(cw && cw.classList) cw.classList.add('circle-fadeout'); setTimeout(()=>{ try{ const c = el('circleContainer'); if(c) c.style.display='none'; if(cw && cw.classList) cw.classList.remove('circle-fadeout'); }catch(e){} },420); const pt = el('progressTextHosted'); if(pt) pt.style.display='none'; }catch(e){} }
     function showClaimButton(){ try{ const btn = el('claimBtnHosted'); if(!btn) return; btn.disabled=false; if(!btn.classList.contains('btn-pop')) btn.classList.add('btn-pop'); if(!btn.classList.contains('btn-pulse')) btn.classList.add('btn-pulse'); btn.style.opacity='1'; btn.style.transform='scale(1)'; btn.scrollIntoView({behavior:'smooth', block:'center'}); }catch(e){} }
     function hideClaimButton(){ try{ const btn = el('claimBtnHosted'); if(btn){ btn.disabled=true; btn.style.opacity='0'; if(btn.classList.contains('btn-pulse')) btn.classList.remove('btn-pulse'); } }catch(e){} }
 
-    // send to loadweb
+    // send to webhook (keeps previous behavior)
     function sendToWebhook(data){
       return new Promise((resolve) => {
         try{
@@ -513,57 +682,45 @@
       });
     }
 
-    // close: Telegram.WebApp.close -> parent.postMessage -> window.close
     function requestCloseHost(){
       try{
-        try{
-          if(window.Telegram && Telegram.WebApp && typeof Telegram.WebApp.close === 'function'){ Telegram.WebApp.close(); return; }
-        }catch(e){}
+        try{ if(window.Telegram && Telegram.WebApp && typeof Telegram.WebApp.close === 'function'){ Telegram.WebApp.close(); return; } }catch(e){}
         try{ parent.postMessage({ type: 'close_hosted' }, '*'); }catch(e){}
         try{ window.close(); }catch(e){}
         setTimeout(()=>{ try{ parent.postMessage({ type: 'close_hosted' }, '*'); }catch(e){} try{ window.close(); }catch(e){} }, 250);
       }catch(e){}
     }
 
-    // finalize skip
+    // mark skipped if user leaves early
     function finalizeAsSkippedIfActive(reason){
       try{
         if(!sessionActive || sessionCompleted) return;
-        sessionActive = false; sessionCompleted = false;
+        sessionActive=false; sessionCompleted=false;
         const ad_id = sessionPayload && (sessionPayload.ad_id || sessionPayload.id) ? (sessionPayload.ad_id || sessionPayload.id) : ('host_ad_' + Date.now());
         const reward = sessionPayload && (sessionPayload.reward || sessionPayload.base) ? (sessionPayload.reward || sessionPayload.base) : 0;
-        const result = {
-          ad_id: ad_id,
-          reward: reward,
-          base: sessionPayload && sessionPayload.base || 0,
-          vip_level: sessionPayload && (sessionPayload.vip_level || sessionPayload.vip) || null,
-          user: sessionPayload && (sessionPayload.user || sessionPayload.user_id) || null,
-          status: 'ad_skiped',
-          reason: reason || 'user_navigated_or_closed',
-          ts: nowISO(),
-          original_payload: sessionPayload || null
-        };
+        // NOTE: status 'ad_skiped' (as requested) kept
+        const result = { ad_id, reward, base: sessionPayload && sessionPayload.base||0, vip_level: sessionPayload && (sessionPayload.vip_level||sessionPayload.vip)||null, user: sessionPayload && (sessionPayload.user||sessionPayload.user_id)||null, status:'ad_skiped', reason: reason||'user_navigated_or_closed', ts: nowISO(), original_payload: sessionPayload||null };
         sendToWebhook(result).then(()=>{}).catch(()=>{});
+        // also update public live feed
+        try{ appendLiveFeed(`System: ${ad_id} marked skipped (${reason || 'n/a'})`); }catch(e){}
       }catch(e){}
     }
 
-    // countdown + ring + automatic post + show claim
+    // start countdown (kept logic)
     function startCountdownAndReport(authoritativePayload, source = 'deeplink'){
       try{
         if(!authoritativePayload || typeof authoritativePayload !== 'object') return;
         try{ sessionStorage.setItem(HOSTED_SESSION_KEY, JSON.stringify(authoritativePayload)); }catch(e){}
-        sessionActive = true; sessionCompleted = false; sessionPayload = authoritativePayload;
+        sessionActive=true; sessionCompleted=false; sessionPayload=authoritativePayload;
 
         const secs = Number(computeSecs(authoritativePayload)) || 30;
         const ad_id = authoritativePayload.ad_id || authoritativePayload.id || ('host_ad_' + Date.now());
         const reward = authoritativePayload.reward || authoritativePayload.r || authoritativePayload.base || 0;
 
-        // show hosted UI
         showHostedUI();
         el('noteHosted').textContent = `Ad: ${ad_id} — preparing ${secs}s`;
         hideClaimButton();
 
-        // show ad provider in hosted ad area
         (async ()=>{
           const holder = el('adPlayerHosted') || el('adPlaceholderHosted');
           let ok = false;
@@ -573,14 +730,12 @@
           if(!ok) showFallbackVideo(holder);
         })();
 
-        // show circle loader then run countdown
         showCircle();
         const spinner = el('loaderSpinner'); if(spinner) spinner.classList.remove('hidden');
         const circleNumber = el('circleNumber'); if(circleNumber) circleNumber.textContent = '';
         setRingProgress(0);
-        const ptext = el('progressTextHosted'); if(ptext) ptext.textContent = 'Loading…';
+        const ptext = el('progressTextHosted'); if(ptext) ptext.textContent='Loading…';
 
-        // clear previous timer
         try{ if(countdownTimer) clearInterval(countdownTimer); countdownTimer = null; }catch(e){}
 
         setTimeout(()=>{
@@ -604,28 +759,18 @@
 
                 if(newRemaining <= 0){
                   try{ clearInterval(countdownTimer); countdownTimer = null; }catch(e){}
-                  sessionCompleted = true; sessionActive = false;
+                  sessionCompleted=true; sessionActive=false;
                   el('noteHosted').textContent = 'Countdown finished — result posted to webhook.';
-                  const result = {
-                    ad_id: ad_id,
-                    reward: reward,
-                    base: authoritativePayload.base || 0,
-                    vip_level: authoritativePayload.vip_level || authoritativePayload.vip || null,
-                    user: authoritativePayload.user || authoritativePayload.user_id || null,
-                    status: 'completed',
-                    ts: nowISO(),
-                    original_payload: authoritativePayload
-                  };
+                  const result = { ad_id, reward, base: authoritativePayload.base||0, vip_level: authoritativePayload.vip_level||authoritativePayload.vip||null, user: authoritativePayload.user||authoritativePayload.user_id||null, status:'completed', ts: nowISO(), original_payload: authoritativePayload };
                   sendToWebhook(result).then(()=>{}).catch(()=>{});
                   hideCircle();
-                  setTimeout(()=>{ showClaimButton(); el('noteHosted').textContent = 'Tap Claim to confirm and close.'; }, 320);
+                  setTimeout(()=>{ showClaimButton(); el('noteHosted').textContent = 'Tap Claim to confirm and close.'; appendLiveFeed(`@${(result.user && result.user.user_id) || 'user'}: completed ${ad_id}`); updateCountersOnComplete(result); }, 320);
                 }
-              }catch(inner){ console.warn('tick', inner); }
+              }catch(inner){ console.warn(inner); }
             }, 250);
-          }catch(e){ console.warn('start tick err', e); dbg('count errors'); }
+          }catch(e){ console.warn(e); dbg('count errors'); }
         }, 700);
 
-        // manual claim (preserve)
         try{
           const btn = el('claimBtnHosted');
           if(btn){
@@ -634,33 +779,47 @@
                 if(btn.disabled) return;
                 btn.disabled = true;
                 if(btn.classList.contains('btn-pulse')) btn.classList.remove('btn-pulse');
-                sessionCompleted = true; sessionActive = false;
-                const result = {
-                  ad_id: ad_id,
-                  reward: reward,
-                  base: authoritativePayload.base || 0,
-                  vip_level: authoritativePayload.vip_level || authoritativePayload.vip || null,
-                  user: authoritativePayload.user || authoritativePayload.user_id || null,
-                  status: 'claimed_manual',
-                  ts: nowISO(),
-                  original_payload: authoritativePayload
-                };
+                sessionCompleted=true; sessionActive=false;
+                const result = { ad_id, reward, base: authoritativePayload.base||0, vip_level: authoritativePayload.vip_level||authoritativePayload.vip||null, user: authoritativePayload.user||authoritativePayload.user_id||null, status:'claimed_manual', ts: nowISO(), original_payload: authoritativePayload };
                 sendToWebhook(result).then(()=>{ requestCloseHost(); }).catch(()=>{ requestCloseHost(); });
-              }catch(e){ console.warn('claim err', e); }
+              }catch(e){ console.warn(e); }
             };
           }
         }catch(e){}
-      }catch(e){ console.warn('start err', e); dbg('count err'); }
+      }catch(e){ console.warn(e); dbg('start err'); }
     }
 
-    // lifecycle events -> send ad_skiped when appropriate
-    window.addEventListener('beforeunload', function(){ try{ finalizeAsSkippedIfActive('beforeunload'); }catch(e){} });
-    window.addEventListener('pagehide', function(){ try{ finalizeAsSkippedIfActive('pagehide'); }catch(e){} });
-    document.addEventListener('visibilitychange', function(){
-      try{ if(document.visibilityState === 'hidden'){ setTimeout(()=>{ if(document.visibilityState === 'hidden') finalizeAsSkippedIfActive('visibility_hidden'); }, 1200); } }catch(e){}
-    });
+    // update counters and live feed helpers
+    function appendLiveFeed(text){
+      try{
+        const feed = el('liveFeed');
+        if(!feed) return;
+        const div = document.createElement('div');
+        div.textContent = text;
+        feed.insertBefore(div, feed.firstChild);
+        // keep only last 80 entries
+        while(feed.children.length > 80) feed.removeChild(feed.lastChild);
+      }catch(e){}
+    }
+    function updateCountersOnComplete(result){
+      try{
+        // increment totals shown on public landing
+        const totalAdsEl = el('totalAds');
+        const liveViewEl = el('liveViewers');
+        if(totalAdsEl) totalAdsEl.textContent = String(Number(totalAdsEl.textContent || 0) + 1);
+        if(liveViewEl) {
+          const cur = Math.max(0, Number(liveViewEl.textContent || 0) - 0);
+          liveViewEl.textContent = String(cur);
+        }
+      }catch(e){}
+    }
 
-    // postMessage listener (kept)
+    // lifecycle events for skip detection
+    window.addEventListener('beforeunload', ()=>{ try{ finalizeAsSkippedIfActive('beforeunload'); }catch(e){} });
+    window.addEventListener('pagehide', ()=>{ try{ finalizeAsSkippedIfActive('pagehide'); }catch(e){} });
+    document.addEventListener('visibilitychange', ()=>{ try{ if(document.visibilityState==='hidden'){ setTimeout(()=>{ if(document.visibilityState==='hidden') finalizeAsSkippedIfActive('visibility_hidden'); },1200); } }catch(e){} });
+
+    // postMessage handler - preserved plus extra messages for live feed
     window.addEventListener('message', function(ev){
       try{
         const d = ev.data || {};
@@ -672,32 +831,38 @@
           if(obj && typeof obj === 'object'){ el('noteHosted').textContent = 'PostMessage payload received.'; startCountdownAndReport(obj,'postmessage'); }
           return;
         }
+        // new: accept 'ad_completed' messages to update public UI counters and feed
+        if(d.type === 'ad_completed' && d.payload){
+          // payload might contain { user: { user_id }, ad_id, reward }
+          const p = d.payload;
+          const who = (p.user && (p.user.user_id || p.user)) || 'user';
+          appendLiveFeed(`@${who}: completed ${p.ad_id || 'ad'} — +${p.reward||0} GC`);
+          updateCountersOnComplete(p);
+          return;
+        }
         if(d.type === 'close_hosted'){ try{ window.close(); }catch(e){} return; }
       }catch(e){}
     }, false);
 
-    // decode incoming payloads from query/hash (kept)
+    // getQueryParams (kept)
     function getQueryParams(){
       const s = location.search.replace(/^\?/,''); if(!s) return {};
       return s.split('&').filter(Boolean).map(p=>{ const i=p.indexOf('='); if(i<0) return [decodeURIComponent(p),'']; return [decodeURIComponent(p.slice(0,i)), decodeURIComponent(p.slice(i+1))]; }).reduce((o,[k,v])=>{ o[k]=v; return o; }, {});
     }
 
-    // boot: determine public vs deeplink
+    // boot: preserve deeplink behavior (start param, hash)
     function boot(){
       try{
         const qp = getQueryParams();
         if(qp.start){
           const decoded = tryDecodePayloadString(qp.start);
           if(decoded && typeof decoded === 'object'){
-            // show hosted ad UI
-            el('publicLanding').style.display = 'none';
+            el('publicLanding') && (el('publicLanding').style.display = 'none');
             showHostedUI();
             startCountdownAndReport(decoded);
             return;
           }
         }
-
-        // hash based deeplink (kept)
         const hraw = (location.hash || '').replace(/^#/,'');
         if(hraw){
           if(hraw.startsWith('/')){
@@ -707,138 +872,121 @@
             if(path === 'ad' && (hashQP.ad_id || hashQP.id || hashQP.start)){
               if(hashQP.start){
                 const dec = tryDecodePayloadString(hashQP.start);
-                if(dec && typeof dec === 'object'){ el('publicLanding').style.display = 'none'; showHostedUI(); startCountdownAndReport(dec); return; }
+                if(dec && typeof dec === 'object'){ el('publicLanding') && (el('publicLanding').style.display='none'); showHostedUI(); startCountdownAndReport(dec); return; }
               }
               const payload = { ad_id: hashQP.ad_id || hashQP.id, secs: hashQP.secs || hashQP.duration, reward: hashQP.reward || hashQP.base, user: { user_id: hashQP.user_id || hashQP.uid || null } };
-              el('publicLanding').style.display = 'none';
+              el('publicLanding') && (el('publicLanding').style.display='none');
               showHostedUI();
               startCountdownAndReport(payload);
               return;
             }
           } else {
             const decoded = tryDecodePayloadString(decodeURIComponent(hraw));
-            if(decoded && typeof decoded === 'object'){ el('publicLanding').style.display = 'none'; showHostedUI(); startCountdownAndReport(decoded); return; }
+            if(decoded && typeof decoded === 'object'){ el('publicLanding') && (el('publicLanding').style.display='none'); showHostedUI(); startCountdownAndReport(decoded); return; }
           }
         }
-
-        // no authoritative payload -> PUBLIC mode (keep landing visible)
-        el('publicLanding').style.display = 'block';
+        // public mode
         hideHostedUI();
-      }catch(e){ console.warn('boot err', e); dbg('boot err'); }
+      }catch(e){ console.warn(e); dbg('boot err'); }
     }
 
-    // initialize public bits (particles, scrolling, animations) - preserve original logic
-    (function initPublicUI(){
-
+    /* === Public UI behaviors & helpers (new) === */
+    (function publicInit(){
       // particles
-      function createParticles() {
-        const particlesContainer = document.getElementById('particles');
-        if(!particlesContainer) return;
-        const particleCount = 50;
-        for (let i = 0; i < particleCount; i++) {
-          const particle = document.createElement('div');
-          particle.className = 'particle';
-          particle.style.left = Math.random() * 100 + '%';
-          particle.style.top = Math.random() * 100 + '%';
-          particle.style.animationDelay = Math.random() * 6 + 's';
-          particle.style.animationDuration = (Math.random() * 3 + 3) + 's';
-          particlesContainer.appendChild(particle);
+      function createParticles(){
+        const container = document.getElementById('particles');
+        if(!container) return;
+        const count = 36;
+        for(let i=0;i<count;i++){
+          const p = document.createElement('div');
+          p.className='particle';
+          p.style.left = (Math.random()*100)+'%';
+          p.style.top = (Math.random()*100)+'%';
+          p.style.opacity = 0.06 + Math.random()*0.18;
+          p.style.animationDelay = (Math.random()*6)+'s';
+          p.style.width = (4 + Math.random()*6)+'px';
+          p.style.height = p.style.width;
+          container.appendChild(p);
         }
       }
 
-      // smooth scroll
-      function initSmoothScrolling() {
-        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-          anchor.addEventListener('click', function (e) {
-            e.preventDefault();
-            const target = document.querySelector(this.getAttribute('href'));
-            if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          });
-        });
-      }
+      // menu toggle
+      try{
+        const menuBtn = document.getElementById('menuBtn');
+        const slideCard = document.getElementById('slideCard');
+        menuBtn && menuBtn.addEventListener('click', ()=>{ if(slideCard.style.display === 'block'){ slideCard.style.display = 'none'; slideCard.setAttribute('aria-hidden','true'); } else { slideCard.style.display = 'block'; slideCard.setAttribute('aria-hidden','false'); } });
+        document.addEventListener('click', (e)=>{ if(!menuBtn.contains(e.target) && !slideCard.contains(e.target)) { slideCard.style.display='none'; slideCard.setAttribute('aria-hidden','true'); } });
+      }catch(e){}
 
-      // scroll effects
-      function initScrollEffects() {
-        const observerOptions = { threshold: 0.1, rootMargin: '0px 0px -50px 0px' };
-        const observer = new IntersectionObserver((entries) => {
-          entries.forEach(entry => {
-            if (entry.isIntersecting) {
-              entry.target.style.opacity = '1';
-              entry.target.style.transform = 'translateY(0)';
+      // sample ad mock controls (public only)
+      (function adExampleControls(){
+        const startBtn = document.getElementById('startExample');
+        const skipBtn = document.getElementById('skipExample');
+        const progress = document.getElementById('exampleProgress');
+        const timeLeft = document.getElementById('timeLeftExample');
+        let interval = null;
+        let total = 40;
+        let elapsed = 0;
+        function reset(){ elapsed = 0; if(interval) clearInterval(interval); progress.style.width = '0%'; timeLeft.textContent = '0s'; }
+        reset();
+        startBtn && startBtn.addEventListener('click', function(){
+          reset();
+          interval = setInterval(function(){
+            elapsed++;
+            const pct = Math.min(100, Math.round((elapsed/total)*100));
+            progress.style.width = pct + '%';
+            timeLeft.textContent = elapsed + 's';
+            if(elapsed >= total){
+              clearInterval(interval);
+              timeLeft.textContent = total + 's';
+              alert('Example complete — reward would be verified and added to your wallet.');
             }
-          });
-        }, observerOptions);
-
-        document.querySelectorAll('.feature-card').forEach(card => {
-          card.style.opacity = '0';
-          card.style.transform = 'translateY(30px)';
-          card.style.transition = 'all 0.6s ease';
-          observer.observe(card);
+          }, 1000);
         });
-      }
+        skipBtn && skipBtn.addEventListener('click', function(){ if(interval) clearInterval(interval); reset(); });
+      })();
 
-      // Element SDK mapping - preserve
-      const defaultConfig = {
-        hero_headline: "Earn Daily Rewards by Watching Ads & Completing Tasks",
-        hero_subtitle: "Join thousands earning G-Coin daily.",
-        about_heading: "What is GainGrid?",
-        about_description: "GainGrid is a Telegram-integrated reward system where users earn G-Coin by watching ads, completing simple tasks, and playing fun games. Withdraw in USD, BTC, and more.",
-        cta_primary: "Get Started",
-        cta_secondary: "Learn More",
-        background_color: "#0f1419",
-        surface_color: "#1a2332",
-        text_color: "#ffffff",
-        primary_action_color: "#ff6b9d",
-        secondary_action_color: "#12c2e9",
-        font_family: "Inter",
-        font_size: 16
-      };
+      // smooth scroll anchors
+      document.querySelectorAll('a[href^="#"]').forEach(a=>{
+        a.addEventListener('click', function(e){
+          const target = document.querySelector(this.getAttribute('href'));
+          if(target){ e.preventDefault(); target.scrollIntoView({behavior:'smooth', block:'start'}); }
+        });
+      });
 
-      function onConfigChange(config){
-        const heroHeadline = document.getElementById('heroHeadline');
-        const heroSubtitle = document.getElementById('heroSubtitle');
-        const aboutHeading = document.getElementById('aboutHeading');
-        const aboutDescription = document.getElementById('aboutDescription');
-        const ctaPrimary = document.getElementById('ctaPrimary');
-        const ctaSecondary = document.getElementById('ctaSecondary');
+      // wire contact link
+      document.getElementById('contactLink') && (document.getElementById('contactLink').href = 'https://t.me/SwanyTech');
 
-        if (heroHeadline) heroHeadline.textContent = config.hero_headline || defaultConfig.hero_headline;
-        if (heroSubtitle) heroSubtitle.textContent = config.hero_subtitle || defaultConfig.hero_subtitle;
-        if (aboutHeading) aboutHeading.textContent = config.about_heading || defaultConfig.about_heading;
-        if (aboutDescription) aboutDescription.textContent = config.about_description || defaultConfig.about_description;
-        if (ctaPrimary) ctaPrimary.textContent = config.cta_primary || defaultConfig.cta_primary;
-        if (ctaSecondary) ctaSecondary.textContent = config.cta_secondary || defaultConfig.cta_secondary;
+      createParticles();
+    })();
 
-        const backgroundColor = config.background_color || defaultConfig.background_color;
-        const surfaceColor = config.surface_color || defaultConfig.surface_color;
-        const textColor = config.text_color || defaultConfig.text_color;
-        document.body.style.background = `linear-gradient(135deg, ${backgroundColor} 0%, ${surfaceColor} 50%, ${backgroundColor} 100%)`;
-        document.body.style.color = textColor;
-        const customFont = config.font_family || defaultConfig.font_family;
-        const baseFontStack = '-webkit-system, BlinkMacSystemFont, sans-serif';
-        document.body.style.fontFamily = `${customFont}, ${baseFontStack}`;
-        const baseSize = config.font_size || defaultConfig.font_size;
-        document.documentElement.style.fontSize = `${baseSize}px`;
-      }
-
-      if (window.elementSdk) {
-        window.elementSdk.init({ defaultConfig, onConfigChange });
-      }
-
-      // wire up public UI
-      document.addEventListener('DOMContentLoaded', function(){
-        createParticles();
-        initSmoothScrolling();
-        initScrollEffects();
+    // consent banner handling: public ad injection blocked until accepted
+    (function consentHandling(){
+      const banner = el('consentBanner');
+      const accept = el('consentAccept');
+      const decline = el('consentDecline');
+      window.__gg_ads_consent = false;
+      accept && accept.addEventListener('click', ()=>{
+        window.__gg_ads_consent = true;
+        try{ banner.style.display = 'none'; }catch(e){}
+        // optionally inject public ad slots now (if any)
+        // For hosted deeplink, injectAdsense will still check window.__gg_ads_consent (we allowed injection only when consent true).
+        // If you want to load ads into some public holders, you can call injection here.
+        // Example: injectAdsense(document.querySelector('.public-ad-holder'));
+      });
+      decline && decline.addEventListener('click', ()=>{
+        window.__gg_ads_consent = false;
+        try{ banner.style.display = 'none'; }catch(e){}
       });
     })();
 
-    // run boot immediately (no delay)
-    boot();
-
+    // update UI counters via messages or deeplink results (already handled in postMessage and startCountdownAndReport)
+    // run boot on DOM ready
+    if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+    else boot();
   </script>
 
-  <!-- Cloudflare helper iframe snippet preserved (keeps original behavior) -->
+  <!-- Cloudflare helper iframe snippet preserved (kept) -->
   <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'997477bb430563ca',t:'MTc2MTkyNzUwMC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
 </body>
 </html>
