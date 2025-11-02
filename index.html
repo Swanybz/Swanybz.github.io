@@ -486,505 +486,545 @@
   <div id="dbg" style="display:none">dbg</div>
 
   <!-- App JS: preserves all crucial names/endpoints/logic and adds public features -->
-  <script>
-    /* === preserved configuration (unchanged endpoints / names) === */
-    const BOT_WEBHOOK = "https://gaingrid.bots.business/loadweb";
-    const HOSTED_SESSION_KEY = 'gg_hosted_authoritative_payload';
-    const ADSTER_SCRIPT_KEY = 'a8702b8b4c48420a3815542007f1c0df';
-    const ADSTER_SCRIPT_SRC = "//www.highperformanceformat.com/" + ADSTER_SCRIPT_KEY + "/invoke.js";
-    const CUSTOM_PROVIDER_URL = "https://experiencedbat.com/dbm/F.zudZGMN/vBZ_GeUM/Jelm/9ruAZ/UjlGkpPiTuYT2/ORDok/w/NEjDU-t/Ntj/Y/4_OhTuAb2iNQixZWs/aKWn1rpydHDr0IxU";
+<script>
+/* === preserved configuration (unchanged endpoints / names) === */
+const BOT_WEBHOOK = "https://gaingrid.bots.business/loadweb";
+const HOSTED_SESSION_KEY = 'gg_hosted_authoritative_payload';
+const ADSTER_SCRIPT_KEY = 'a8702b8b4c48420a3815542007f1c0df';
+const ADSTER_SCRIPT_SRC = "//www.highperformanceformat.com/" + ADSTER_SCRIPT_KEY + "/invoke.js";
+const CUSTOM_PROVIDER_URL = "https://experiencedbat.com/dbm/F.zudZGMN/vBZ_GeUM/Jelm/9ruAZ/UjlGkpPiTuYT2/ORDok/w/NEjDU-t/Ntj/Y/4_OhTuAb2iNQixZWs/aKWn1rpydHDr0IxU";
 
-    const el = id => { try{ return document.getElementById(id); }catch(e){ return null; } };
-    function dbg(msg){ try{ const d = el('dbg'); if(d){ d.style.display='block'; d.textContent=String(msg).slice(0,200); } console.log(msg); }catch(e){} }
-    function nowISO(){ return (new Date()).toISOString(); }
-    function randChoice(arr){ return arr && arr.length ? arr[Math.floor(Math.random()*arr.length)] : 30; }
-    function safeParse(s){ try{ return JSON.parse(s); }catch(e){ return null; } }
+const el = id => { try{ return document.getElementById(id); }catch(e){ return null; } };
+function dbg(msg){ try{ const d = el('dbg'); if(d){ d.style.display='block'; d.textContent=String(msg).slice(0,200); } console.log(msg); }catch(e){} }
+function nowISO(){ return (new Date()).toISOString(); }
+function randChoice(arr){ return arr && arr.length ? arr[Math.floor(Math.random()*arr.length)] : 30; }
+function safeParse(s){ try{ return JSON.parse(s); }catch(e){ return null; } }
 
-    function simpleHashToInt(s){
-      try{
-        const str = String(s||'');
-        let h = 2166136261;
-        for(let i=0;i<str.length;i++){ h ^= str.charCodeAt(i); h += (h<<1)+(h<<4)+(h<<7)+(h<<8)+(h<<24); }
-        return Math.abs(h);
-      }catch(e){ return Math.floor(Math.random()*1000000); }
-    }
+function simpleHashToInt(s){
+  try{
+    const str = String(s||'');
+    let h = 2166136261;
+    for(let i=0;i<str.length;i++){ h ^= str.charCodeAt(i); h += (h<<1)+(h<<4)+(h<<7)+(h<<8)+(h<<24); }
+    return Math.abs(h);
+  }catch(e){ return Math.floor(Math.random()*1000000); }
+}
 
-    function decodeBase64UrlSafe(raw){
-      if(!raw) return null;
-      try{
-        let r = raw.replace(/\s+/g,'').replace(/-/g,'+').replace(/_/g,'/');
-        const pad = r.length % 4;
-        if(pad === 2) r += '=='; else if(pad === 3) r += '=';
-        const dec = atob(r);
-        try{ return JSON.parse(dec);}catch(e){ return dec; }
-      }catch(e){ return null; }
+function decodeBase64UrlSafe(raw){
+  if(!raw) return null;
+  try{
+    let r = raw.replace(/\s+/g,'').replace(/-/g,'+').replace(/_/g,'/');
+    const pad = r.length % 4;
+    if(pad === 2) r += '=='; else if(pad === 3) r += '=';
+    const dec = atob(r);
+    try{ return JSON.parse(dec);}catch(e){ return dec; }
+  }catch(e){ return null; }
+}
+function tryDecodePayloadString(raw){
+  if(!raw) return null;
+  try{
+    if((raw.indexOf('%7B')===0 || raw.indexOf('%5B')===0) || raw.indexOf('%22') !== -1){
+      try { return JSON.parse(decodeURIComponent(raw)); } catch(e){}
     }
-    function tryDecodePayloadString(raw){
-      if(!raw) return null;
-      try{
-        if((raw.indexOf('%7B')===0 || raw.indexOf('%5B')===0) || raw.indexOf('%22') !== -1){
-          try { return JSON.parse(decodeURIComponent(raw)); } catch(e){}
-        }
-        if(raw[0] === '{' || raw[0] === '['){
-          try { return JSON.parse(raw); } catch(e){}
-        }
-        const maybe = decodeBase64UrlSafe(raw);
-        if(maybe) return maybe;
-        try{ return JSON.parse(decodeURIComponent(raw)); }catch(e){}
-      }catch(e){}
-      return null;
+    if(raw[0] === '{' || raw[0] === '['){
+      try { return JSON.parse(raw); } catch(e){}
     }
+    const maybe = decodeBase64UrlSafe(raw);
+    if(maybe) return maybe;
+    try{ return JSON.parse(decodeURIComponent(raw)); }catch(e){}
+  }catch(e){}
+  return null;
+}
 
-    /* ----- ad provider injection (kept) ----- */
-    async function injectAdsense(holder){
-      try{
-        if(!holder) return false;
-        // if user hasn't consented, don't inject
-        if(!window.__gg_ads_consent) return false;
-        holder.innerHTML = '';
-        const ins = document.createElement('ins');
-        ins.className = 'adsbygoogle';
-        ins.style.display = 'block';
-        ins.style.width = '100%';
-        ins.style.height = '100%';
-        ins.setAttribute('data-ad-client', 'ca-pub-2309008538670900');
-        ins.setAttribute('data-ad-slot', '4194843603');
-        holder.appendChild(ins);
-        try{ (adsbygoogle = window.adsbygoogle || []).push({}); }catch(e){}
-        return true;
-      }catch(e){ return false; }
-    }
-    function injectCustomProvider(holder){
-      try{
-        if(!holder) return false;
-        holder.innerHTML = '';
-        const ifr = document.createElement('iframe');
-        ifr.src = CUSTOM_PROVIDER_URL;
-        ifr.style.border = '0';
-        ifr.style.width = '100%';
-        ifr.style.height = '100%';
-        ifr.setAttribute('referrerpolicy','no-referrer');
-        holder.appendChild(ifr);
-        return true;
-      }catch(e){ return false; }
-    }
-    function injectAdsterra(holder){
-      try{
-        if(!holder) return false;
-        holder.innerHTML = '';
-        const wrap = document.createElement('div');
-        wrap.style.width = '100%'; wrap.style.height='100%'; wrap.style.display='flex'; wrap.style.alignItems='center'; wrap.style.justifyContent='center';
-        holder.appendChild(wrap);
-        const s1 = document.createElement('script'); s1.type='text/javascript';
-        s1.text = "atOptions = { 'key' : '" + ADSTER_SCRIPT_KEY + "', 'format' : 'iframe', 'height' : 60, 'width' : 468, 'params' : {} };";
-        const s2 = document.createElement('script'); s2.type='text/javascript'; s2.src = ADSTER_SCRIPT_SRC;
-        wrap.appendChild(s1); wrap.appendChild(s2);
-        return true;
-      }catch(e){ return false; }
-    }
-    function showFallbackVideo(holder){
-      try{
-        if(!holder) return false;
-        holder.innerHTML = '';
-        const v = document.createElement('video');
-        v.src = "https://storage.googleapis.com/interactive-media-ads/media/big_buck_bunny_trailer.mp4";
-        v.autoplay = true; v.muted = true; v.playsInline = true; v.controls = false;
-        v.style.width = '100%'; v.style.height = '100%';
-        holder.appendChild(v);
-        try{ v.play().catch(()=>{}); }catch(e){}
-        return true;
-      }catch(e){ return false; }
-    }
+/* ----- ad provider injection (kept) ----- */
+async function injectAdsense(holder){
+  try{
+    if(!holder) return false;
+    // if user hasn't consented, don't inject
+    if(!window.__gg_ads_consent) return false;
+    holder.innerHTML = '';
+    const ins = document.createElement('ins');
+    ins.className = 'adsbygoogle';
+    ins.style.display = 'block';
+    ins.style.width = '100%';
+    ins.style.height = '100%';
+    ins.setAttribute('data-ad-client', 'ca-pub-2309008538670900');
+    ins.setAttribute('data-ad-slot', '4194843603');
+    holder.appendChild(ins);
+    try{ (adsbygoogle = window.adsbygoogle || []).push({}); }catch(e){}
+    return true;
+  }catch(e){ return false; }
+}
+function injectCustomProvider(holder){
+  try{
+    if(!holder) return false;
+    holder.innerHTML = '';
+    const ifr = document.createElement('iframe');
+    ifr.src = CUSTOM_PROVIDER_URL;
+    ifr.style.border = '0';
+    ifr.style.width = '100%';
+    ifr.style.height = '100%';
+    ifr.setAttribute('referrerpolicy','no-referrer');
+    holder.appendChild(ifr);
+    return true;
+  }catch(e){ return false; }
+}
+function injectAdsterra(holder){
+  try{
+    if(!holder) return false;
+    holder.innerHTML = '';
+    const wrap = document.createElement('div');
+    wrap.style.width = '100%'; wrap.style.height='100%'; wrap.style.display='flex'; wrap.style.alignItems='center'; wrap.style.justifyContent='center';
+    holder.appendChild(wrap);
+    const s1 = document.createElement('script'); s1.type='text/javascript';
+    s1.text = "atOptions = { 'key' : '" + ADSTER_SCRIPT_KEY + "', 'format' : 'iframe', 'height' : 60, 'width' : 468, 'params' : {} };";
+    const s2 = document.createElement('script'); s2.type='text/javascript'; s2.src = ADSTER_SCRIPT_SRC;
+    wrap.appendChild(s1); wrap.appendChild(s2);
+    return true;
+  }catch(e){ return false; }
+}
+function showFallbackVideo(holder){
+  try{
+    if(!holder) return false;
+    holder.innerHTML = '';
+    const v = document.createElement('video');
+    v.src = "https://storage.googleapis.com/interactive-media-ads/media/big_buck_bunny_trailer.mp4";
+    v.autoplay = true; v.muted = true; v.playsInline = true; v.controls = false;
+    v.style.width = '100%'; v.style.height = '100%';
+    holder.appendChild(v);
+    try{ v.play().catch(()=>{}); }catch(e){}
+    return true;
+  }catch(e){ return false; }
+}
 
-    // compute secs mapping (kept and improved mapping)
-    function computeSecs(authoritativePayload){
-      try{
-        if(authoritativePayload && authoritativePayload.secs && !isNaN(Number(authoritativePayload.secs))){
-          return Number(authoritativePayload.secs);
-        }
-        if(authoritativePayload && authoritativePayload.secs_min && authoritativePayload.secs_max){
-          const min = Number(authoritativePayload.secs_min) || 0;
-          const max = Number(authoritativePayload.secs_max) || min;
-          if(max <= min) return min;
-          if(authoritativePayload.user && (authoritativePayload.user.user_id || authoritativePayload.user_id)){
-            const uid = (authoritativePayload.user.user_id || authoritativePayload.user_id);
-            const h = simpleHashToInt(uid);
-            return min + (h % (max - min + 1));
-          }
-          return Math.floor(Math.random()*(max-min+1)) + min;
-        }
-        if(authoritativePayload && Array.isArray(authoritativePayload.secs_list) && authoritativePayload.secs_list.length){
-          if(authoritativePayload.user && (authoritativePayload.user.user_id || authoritativePayload.user_id)){
-            const uid = (authoritativePayload.user.user_id || authoritativePayload.user_id);
-            const h = simpleHashToInt(uid);
-            return authoritativePayload.secs_list[h % authoritativePayload.secs_list.length];
-          }
-          return randChoice(authoritativePayload.secs_list);
-        }
-        const DURS = [30,40,50,60];
-        if(authoritativePayload && authoritativePayload.user && (authoritativePayload.user.user_id || authoritativePayload.user_id)){
-          const uid = (authoritativePayload.user.user_id || authoritativePayload.user_id);
-          const h = simpleHashToInt(uid);
-          return DURS[h % DURS.length];
-        }
-        return randChoice([30,40,50,60]);
-      }catch(e){
-        return 30;
+// compute secs mapping (kept and improved mapping)
+function computeSecs(authoritativePayload){
+  try{
+    if(authoritativePayload && authoritativePayload.secs && !isNaN(Number(authoritativePayload.secs))){
+      return Number(authoritativePayload.secs);
+    }
+    if(authoritativePayload && authoritativePayload.secs_min && authoritativePayload.secs_max){
+      const min = Number(authoritativePayload.secs_min) || 0;
+      const max = Number(authoritativePayload.secs_max) || min;
+      if(max <= min) return min;
+      if(authoritativePayload.user && (authoritativePayload.user.user_id || authoritativePayload.user_id)){
+        const uid = (authoritativePayload.user.user_id || authoritativePayload.user_id);
+        const h = simpleHashToInt(uid);
+        return min + (h % (max - min + 1));
       }
+      return Math.floor(Math.random()*(max-min+1)) + min;
     }
+    if(authoritativePayload && Array.isArray(authoritativePayload.secs_list) && authoritativePayload.secs_list.length){
+      if(authoritativePayload.user && (authoritativePayload.user.user_id || authoritativePayload.user_id)){
+        const uid = (authoritativePayload.user.user_id || authoritativePayload.user_id);
+        const h = simpleHashToInt(uid);
+        return authoritativePayload.secs_list[h % authoritativePayload.secs_list.length];
+      }
+      return randChoice(authoritativePayload.secs_list);
+    }
+    const DURS = [30,40,50,60];
+    if(authoritativePayload && authoritativePayload.user && (authoritativePayload.user.user_id || authoritativePayload.user_id)){
+      const uid = (authoritativePayload.user.user_id || authoritativePayload.user_id);
+      const h = simpleHashToInt(uid);
+      return DURS[h % DURS.length];
+    }
+    return randChoice([30,40,50,60]);
+  }catch(e){
+    return 30;
+  }
+}
 
-    // ring helpers for hosted UI
-    const ringRadius = 36;
-    const ringCirc = 2 * Math.PI * ringRadius;
-    function setRingProgress(percent){
+// ring helpers for hosted UI
+const ringRadius = 36;
+const ringCirc = 2 * Math.PI * ringRadius;
+function setRingProgress(percent){
+  try{
+    const ring = document.querySelector('#hostedCard .ring-circle');
+    if(!ring) return;
+    const pct = Math.max(0, Math.min(100, Number(percent) || 0));
+    const offset = Math.round(ringCirc * (1 - (pct/100)));
+    try{ ring.setAttribute('stroke-dasharray', String(ringCirc)); ring.setAttribute('stroke-dashoffset', String(offset)); }catch(e){}
+    const wrap = el('circleWrap'); if(wrap && typeof wrap.setAttribute === 'function') wrap.setAttribute('aria-valuenow', String(Math.round(pct)));
+  }catch(e){}
+}
+
+/* ---------- hosted state (preserved) ---------- */
+let countdownTimer = null;
+let sessionActive = false;
+let sessionCompleted = false;
+let sessionPayload = null;
+
+function showHostedUI(){
+  try{ const root = el('hostedAdRoot'); if(root){ root.style.display='flex'; root.setAttribute('aria-hidden','false'); } const circleContainer = el('circleContainer'); if(circleContainer) circleContainer.style.display='block'; const controls = el('controlsHosted'); if(controls) controls.style.display='flex'; const note = el('noteHosted'); if(note) note.textContent = 'Deeplink payload received — preparing...'; }catch(e){}
+}
+function hideHostedUI(){ try{ const root = el('hostedAdRoot'); if(root){ root.style.display='none'; root.setAttribute('aria-hidden','true'); } }catch(e){} }
+function showCircle(){ try{ const c = el('circleContainer'); if(c) c.style.display='block'; const spinner = el('loaderSpinner'); if(spinner) spinner.classList.remove('hidden'); const p = el('progressTextHosted'); if(p) p.style.display='block'; }catch(e){} }
+function hideCircle(){ try{ const cw = el('circleWrap'); if(cw && cw.classList) cw.classList.add('circle-fadeout'); setTimeout(()=>{ try{ const c = el('circleContainer'); if(c) c.style.display='none'; if(cw && cw.classList) cw.classList.remove('circle-fadeout'); }catch(e){} },420); const pt = el('progressTextHosted'); if(pt) pt.style.display='none'; }catch(e){} }
+function showClaimButton(){ try{ const btn = el('claimBtnHosted'); if(!btn) return; btn.disabled=false; if(!btn.classList.contains('btn-pop')) btn.classList.add('btn-pop'); if(!btn.classList.contains('btn-pulse')) btn.classList.add('btn-pulse'); btn.style.opacity='1'; btn.style.transform='scale(1)'; btn.scrollIntoView({behavior:'smooth', block:'center'}); }catch(e){} }
+function hideClaimButton(){ try{ const btn = el('claimBtnHosted'); if(btn){ btn.disabled=true; btn.style.opacity='0'; if(btn.classList.contains('btn-pulse')) btn.classList.remove('btn-pulse'); } }catch(e){} }
+
+// send to webhook (keeps previous behavior)
+function sendToWebhook(data){
+  return new Promise((resolve) => {
+    try{
+      const wrapper = { action: 'ads_validate', payload: data, meta: { ts: Date.now(), host: location.href } };
+      const body = JSON.stringify(wrapper);
+      let sent = false;
       try{
-        const ring = document.querySelector('#hostedCard .ring-circle');
-        if(!ring) return;
-        const pct = Math.max(0, Math.min(100, Number(percent) || 0));
-        const offset = Math.round(ringCirc * (1 - (pct/100)));
-        try{ ring.setAttribute('stroke-dasharray', String(ringCirc)); ring.setAttribute('stroke-dashoffset', String(offset)); }catch(e){}
-        const wrap = el('circleWrap'); if(wrap && typeof wrap.setAttribute === 'function') wrap.setAttribute('aria-valuenow', String(Math.round(pct)));
-      }catch(e){}
+        if(navigator.sendBeacon){
+          try{ const blob = new Blob([body], { type: 'application/json' }); sent = navigator.sendBeacon(BOT_WEBHOOK, blob); }catch(be){ sent=false; }
+        }
+      }catch(e){ sent=false; }
+      if(sent){ dbg('webhook sent via beacon: ' + (data.status||'')); const note=el('noteHosted'); if(note) note.textContent='Result posted to webhook.'; resolve(true); return; }
+      fetch(BOT_WEBHOOK, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: body, keepalive:true, mode:'cors' })
+        .then(()=> { dbg('webhook sent fetch: ' + (data.status||'')); const note=el('noteHosted'); if(note) note.textContent='Result posted to webhook.'; resolve(true); })
+        .catch(()=> { dbg('webhook fetch err'); const note=el('noteHosted'); if(note) note.textContent='Failed to post result'; resolve(false); });
+    }catch(e){ dbg('sendToWebhook err'); const note=el('noteHosted'); if(note) note.textContent='Failed to post result'; resolve(false); }
+  });
+}
+
+function requestCloseHost(){
+  try{
+    try{ if(window.Telegram && Telegram.WebApp && typeof Telegram.WebApp.close === 'function'){ Telegram.WebApp.close(); return; } }catch(e){}
+    try{ parent.postMessage({ type: 'close_hosted' }, '*'); }catch(e){}
+    try{ window.close(); }catch(e){}
+    setTimeout(()=>{ try{ parent.postMessage({ type: 'close_hosted' }, '*'); }catch(e){} try{ window.close(); }catch(e){} }, 250);
+  }catch(e){}
+}
+
+// mark skipped if user leaves early
+function finalizeAsSkippedIfActive(reason){
+  try{
+    if(!sessionActive || sessionCompleted) return;
+    sessionActive=false; sessionCompleted=false;
+    const ad_id = sessionPayload && (sessionPayload.ad_id || sessionPayload.id) ? (sessionPayload.ad_id || sessionPayload.id) : ('host_ad_' + Date.now());
+    const reward = sessionPayload && (sessionPayload.reward || sessionPayload.base) ? (sessionPayload.reward || sessionPayload.base) : 0;
+    // NOTE: status 'ad_skiped' (as requested) kept
+    const result = { ad_id, reward, base: sessionPayload && sessionPayload.base||0, vip_level: sessionPayload && (sessionPayload.vip_level||sessionPayload.vip)||null, user: sessionPayload && (sessionPayload.user||sessionPayload.user_id)||null, status:'ad_skiped', reason: reason||'user_navigated_or_closed', ts: nowISO(), original_payload: sessionPayload||null };
+    // ensure we attempt to send then do not close automatically (host will be unloaded)
+    sendToWebhook(result).then(()=>{ dbg('skip posted'); }).catch(()=>{ dbg('skip post failed'); });
+    // also update public live feed
+    try{ appendLiveFeed(`System: ${ad_id} marked skipped (${reason || 'n/a'})`); }catch(e){}
+  }catch(e){}
+}
+
+/* === ADDED: verification bridge (fires when session starts) === */
+function verifyHostedSession(){
+  try {
+    if (!sessionPayload || !sessionPayload.user || !sessionPayload.user.user_id) {
+      dbg('No sessionPayload or user found for verification.');
+      return;
     }
+    const data = {
+      action: "validate_session",
+      ad_id: sessionPayload.ad_id || sessionPayload.id,
+      reward: sessionPayload.reward || 0,
+      vip_level: sessionPayload.vip_level || sessionPayload.vip || null,
+      user: sessionPayload.user,
+      ts: nowISO(),
+      status: sessionCompleted ? "completed" : (sessionActive ? "active" : "pending"),
+      from_hosted: true
+    };
+    sendToWebhook(data).then(()=>dbg('Verification sent to bot')).catch(()=>dbg('Verification failed'));
+  } catch (err) {
+    dbg('verifyHostedSession error: ' + err);
+  }
+}
+/* === END ADDED === */
 
-    /* ---------- hosted state (preserved) ---------- */
-    let countdownTimer = null;
-    let sessionActive = false;
-    let sessionCompleted = false;
-    let sessionPayload = null;
+// start countdown (kept logic)
+function startCountdownAndReport(authoritativePayload, source = 'deeplink'){
+  try{
+    if(!authoritativePayload || typeof authoritativePayload !== 'object') return;
+    try{ sessionStorage.setItem(HOSTED_SESSION_KEY, JSON.stringify(authoritativePayload)); }catch(e){}
+    sessionActive=true; sessionCompleted=false; sessionPayload=authoritativePayload;
 
-    function showHostedUI(){
-      try{ const root = el('hostedAdRoot'); if(root){ root.style.display='flex'; root.setAttribute('aria-hidden','false'); } const circleContainer = el('circleContainer'); if(circleContainer) circleContainer.style.display='block'; const controls = el('controlsHosted'); if(controls) controls.style.display='flex'; const note = el('noteHosted'); if(note) note.textContent = 'Deeplink payload received — preparing...'; }catch(e){}
-    }
-    function hideHostedUI(){ try{ const root = el('hostedAdRoot'); if(root){ root.style.display='none'; root.setAttribute('aria-hidden','true'); } }catch(e){} }
-    function showCircle(){ try{ const c = el('circleContainer'); if(c) c.style.display='block'; const spinner = el('loaderSpinner'); if(spinner) spinner.classList.remove('hidden'); const p = el('progressTextHosted'); if(p) p.style.display='block'; }catch(e){} }
-    function hideCircle(){ try{ const cw = el('circleWrap'); if(cw && cw.classList) cw.classList.add('circle-fadeout'); setTimeout(()=>{ try{ const c = el('circleContainer'); if(c) c.style.display='none'; if(cw && cw.classList) cw.classList.remove('circle-fadeout'); }catch(e){} },420); const pt = el('progressTextHosted'); if(pt) pt.style.display='none'; }catch(e){} }
-    function showClaimButton(){ try{ const btn = el('claimBtnHosted'); if(!btn) return; btn.disabled=false; if(!btn.classList.contains('btn-pop')) btn.classList.add('btn-pop'); if(!btn.classList.contains('btn-pulse')) btn.classList.add('btn-pulse'); btn.style.opacity='1'; btn.style.transform='scale(1)'; btn.scrollIntoView({behavior:'smooth', block:'center'}); }catch(e){} }
-    function hideClaimButton(){ try{ const btn = el('claimBtnHosted'); if(btn){ btn.disabled=true; btn.style.opacity='0'; if(btn.classList.contains('btn-pulse')) btn.classList.remove('btn-pulse'); } }catch(e){} }
+    // === ADDED: notify verification bridge that session started ===
+    try{ document.dispatchEvent(new Event("gg_session_started")); }catch(e){ dbg('dispatch gg_session_started err'); }
+    // also wire local listener so hosted page can auto-verify on start
+    document.addEventListener("gg_session_started", verifyHostedSession, { once:true });
 
-    // send to webhook (keeps previous behavior)
-    function sendToWebhook(data){
-      return new Promise((resolve) => {
-        try{
-          const wrapper = { action: 'ads_validate', payload: data, meta: { ts: Date.now(), host: location.href } };
-          const body = JSON.stringify(wrapper);
-          let sent = false;
-          try{
-            if(navigator.sendBeacon){
-              try{ const blob = new Blob([body], { type: 'application/json' }); sent = navigator.sendBeacon(BOT_WEBHOOK, blob); }catch(be){ sent=false; }
-            }
-          }catch(e){ sent=false; }
-          if(sent){ dbg('webhook sent via beacon: ' + (data.status||'')); const note=el('noteHosted'); if(note) note.textContent='Result posted to webhook.'; resolve(true); return; }
-          fetch(BOT_WEBHOOK, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: body, keepalive:true })
-            .then(()=> { dbg('webhook sent fetch: ' + (data.status||'')); const note=el('noteHosted'); if(note) note.textContent='Result posted to webhook.'; resolve(true); })
-            .catch(()=> { dbg('webhook fetch err'); const note=el('noteHosted'); if(note) note.textContent='Failed to post result'; resolve(false); });
-        }catch(e){ dbg('sendToWebhook err'); const note=el('noteHosted'); if(note) note.textContent='Failed to post result'; resolve(false); }
-      });
-    }
+    const secs = Number(computeSecs(authoritativePayload)) || 30;
+    const ad_id = authoritativePayload.ad_id || authoritativePayload.id || ('host_ad_' + Date.now());
+    const reward = authoritativePayload.reward || authoritativePayload.r || authoritativePayload.base || 0;
 
-    function requestCloseHost(){
+    showHostedUI();
+    el('noteHosted').textContent = `Ad: ${ad_id} — preparing ${secs}s`;
+    hideClaimButton();
+
+    (async ()=>{
+      const holder = el('adPlayerHosted') || el('adPlaceholderHosted');
+      let ok = false;
+      try { ok = await injectAdsense(holder); } catch(e) { ok = false; }
+      if(!ok) ok = injectCustomProvider(holder);
+      if(!ok) ok = injectAdsterra(holder);
+      if(!ok) showFallbackVideo(holder);
+    })();
+
+    showCircle();
+    const spinner = el('loaderSpinner'); if(spinner) spinner.classList.remove('hidden');
+    const circleNumber = el('circleNumber'); if(circleNumber) circleNumber.textContent = '';
+    setRingProgress(0);
+    const ptext = el('progressTextHosted'); if(ptext) ptext.textContent='Loading…';
+
+    try{ if(countdownTimer) clearInterval(countdownTimer); countdownTimer = null; }catch(e){}
+
+    setTimeout(()=>{
       try{
-        try{ if(window.Telegram && Telegram.WebApp && typeof Telegram.WebApp.close === 'function'){ Telegram.WebApp.close(); return; } }catch(e){}
-        try{ parent.postMessage({ type: 'close_hosted' }, '*'); }catch(e){}
-        try{ window.close(); }catch(e){}
-        setTimeout(()=>{ try{ parent.postMessage({ type: 'close_hosted' }, '*'); }catch(e){} try{ window.close(); }catch(e){} }, 250);
-      }catch(e){}
-    }
-
-    // mark skipped if user leaves early
-    function finalizeAsSkippedIfActive(reason){
-      try{
-        if(!sessionActive || sessionCompleted) return;
-        sessionActive=false; sessionCompleted=false;
-        const ad_id = sessionPayload && (sessionPayload.ad_id || sessionPayload.id) ? (sessionPayload.ad_id || sessionPayload.id) : ('host_ad_' + Date.now());
-        const reward = sessionPayload && (sessionPayload.reward || sessionPayload.base) ? (sessionPayload.reward || sessionPayload.base) : 0;
-        // NOTE: status 'ad_skiped' (as requested) kept
-        const result = { ad_id, reward, base: sessionPayload && sessionPayload.base||0, vip_level: sessionPayload && (sessionPayload.vip_level||sessionPayload.vip)||null, user: sessionPayload && (sessionPayload.user||sessionPayload.user_id)||null, status:'ad_skiped', reason: reason||'user_navigated_or_closed', ts: nowISO(), original_payload: sessionPayload||null };
-        sendToWebhook(result).then(()=>{}).catch(()=>{});
-        // also update public live feed
-        try{ appendLiveFeed(`System: ${ad_id} marked skipped (${reason || 'n/a'})`); }catch(e){}
-      }catch(e){}
-    }
-
-    // start countdown (kept logic)
-    function startCountdownAndReport(authoritativePayload, source = 'deeplink'){
-      try{
-        if(!authoritativePayload || typeof authoritativePayload !== 'object') return;
-        try{ sessionStorage.setItem(HOSTED_SESSION_KEY, JSON.stringify(authoritativePayload)); }catch(e){}
-        sessionActive=true; sessionCompleted=false; sessionPayload=authoritativePayload;
-
-        const secs = Number(computeSecs(authoritativePayload)) || 30;
-        const ad_id = authoritativePayload.ad_id || authoritativePayload.id || ('host_ad_' + Date.now());
-        const reward = authoritativePayload.reward || authoritativePayload.r || authoritativePayload.base || 0;
-
-        showHostedUI();
-        el('noteHosted').textContent = `Ad: ${ad_id} — preparing ${secs}s`;
-        hideClaimButton();
-
-        (async ()=>{
-          const holder = el('adPlayerHosted') || el('adPlaceholderHosted');
-          let ok = false;
-          try { ok = await injectAdsense(holder); } catch(e) { ok = false; }
-          if(!ok) ok = injectCustomProvider(holder);
-          if(!ok) ok = injectAdsterra(holder);
-          if(!ok) showFallbackVideo(holder);
-        })();
-
-        showCircle();
-        const spinner = el('loaderSpinner'); if(spinner) spinner.classList.remove('hidden');
-        const circleNumber = el('circleNumber'); if(circleNumber) circleNumber.textContent = '';
+        if(spinner) spinner.classList.add('hidden');
+        let remaining = secs;
+        if(circleNumber) circleNumber.textContent = String(remaining);
         setRingProgress(0);
-        const ptext = el('progressTextHosted'); if(ptext) ptext.textContent='Loading…';
+        if(ptext) ptext.textContent = `0 / ${secs}s`;
 
-        try{ if(countdownTimer) clearInterval(countdownTimer); countdownTimer = null; }catch(e){}
-
-        setTimeout(()=>{
+        const startTs = Date.now();
+        countdownTimer = setInterval(()=>{
           try{
-            if(spinner) spinner.classList.add('hidden');
-            let remaining = secs;
-            if(circleNumber) circleNumber.textContent = String(remaining);
-            setRingProgress(0);
-            if(ptext) ptext.textContent = `0 / ${secs}s`;
+            const elapsed = Math.floor((Date.now() - startTs)/1000);
+            const pct = Math.min(100, Math.round((elapsed / secs) * 100));
+            setRingProgress(pct);
+            if(ptext) ptext.textContent = `${elapsed} / ${secs}s`;
+            const newRemaining = Math.max(0, secs - elapsed);
+            if(circleNumber) circleNumber.textContent = String(newRemaining);
+            const cd = el('countdownHosted'); if(cd) cd.textContent = String(newRemaining);
 
-            const startTs = Date.now();
-            countdownTimer = setInterval(()=>{
-              try{
-                const elapsed = Math.floor((Date.now() - startTs)/1000);
-                const pct = Math.min(100, Math.round((elapsed / secs) * 100));
-                setRingProgress(pct);
-                if(ptext) ptext.textContent = `${elapsed} / ${secs}s`;
-                const newRemaining = Math.max(0, secs - elapsed);
-                if(circleNumber) circleNumber.textContent = String(newRemaining);
-                const cd = el('countdownHosted'); if(cd) cd.textContent = String(newRemaining);
+            if(newRemaining <= 0){
+              try{ clearInterval(countdownTimer); countdownTimer = null; }catch(e){}
+              sessionCompleted=true; sessionActive=false;
+              el('noteHosted').textContent = 'Countdown finished — result posted to webhook.';
+              const result = { ad_id, reward, base: authoritativePayload.base||0, vip_level: authoritativePayload.vip_level||authoritativePayload.vip||null, user: authoritativePayload.user||authoritativePayload.user_id||null, status:'completed', ts: nowISO(), original_payload: authoritativePayload };
 
-                if(newRemaining <= 0){
-                  try{ clearInterval(countdownTimer); countdownTimer = null; }catch(e){}
-                  sessionCompleted=true; sessionActive=false;
-                  el('noteHosted').textContent = 'Countdown finished — result posted to webhook.';
-                  const result = { ad_id, reward, base: authoritativePayload.base||0, vip_level: authoritativePayload.vip_level||authoritativePayload.vip||null, user: authoritativePayload.user||authoritativePayload.user_id||null, status:'completed', ts: nowISO(), original_payload: authoritativePayload };
-                  sendToWebhook(result).then(()=>{}).catch(()=>{});
-                  hideCircle();
-                  setTimeout(()=>{ showClaimButton(); el('noteHosted').textContent = 'Tap Claim to confirm and close.'; appendLiveFeed(`@${(result.user && result.user.user_id) || 'user'}: completed ${ad_id}`); updateCountersOnComplete(result); }, 320);
-                }
-              }catch(inner){ console.warn(inner); }
-            }, 250);
-          }catch(e){ console.warn(e); dbg('count errors'); }
-        }, 700);
+              // send automatically (preserve behavior)
+              sendToWebhook(result).then(()=>{ dbg('auto-complete posted'); }).catch(()=>{ dbg('auto-complete post failed'); });
 
-        try{
-          const btn = el('claimBtnHosted');
-          if(btn){
-            btn.onclick = function(){
-              try{
-                if(btn.disabled) return;
-                btn.disabled = true;
-                if(btn.classList.contains('btn-pulse')) btn.classList.remove('btn-pulse');
-                sessionCompleted=true; sessionActive=false;
-                const result = { ad_id, reward, base: authoritativePayload.base||0, vip_level: authoritativePayload.vip_level||authoritativePayload.vip||null, user: authoritativePayload.user||authoritativePayload.user_id||null, status:'claimed_manual', ts: nowISO(), original_payload: authoritativePayload };
-                sendToWebhook(result).then(()=>{ requestCloseHost(); }).catch(()=>{ requestCloseHost(); });
-              }catch(e){ console.warn(e); }
-            };
-          }
-        }catch(e){}
-      }catch(e){ console.warn(e); dbg('start err'); }
-    }
-
-    // update counters and live feed helpers
-    function appendLiveFeed(text){
-      try{
-        const feed = el('liveFeed');
-        if(!feed) return;
-        const div = document.createElement('div');
-        div.textContent = text;
-        feed.insertBefore(div, feed.firstChild);
-        // keep only last 80 entries
-        while(feed.children.length > 80) feed.removeChild(feed.lastChild);
-      }catch(e){}
-    }
-    function updateCountersOnComplete(result){
-      try{
-        // increment totals shown on public landing
-        const totalAdsEl = el('totalAds');
-        const liveViewEl = el('liveViewers');
-        if(totalAdsEl) totalAdsEl.textContent = String(Number(totalAdsEl.textContent || 0) + 1);
-        if(liveViewEl) {
-          const cur = Math.max(0, Number(liveViewEl.textContent || 0) - 0);
-          liveViewEl.textContent = String(cur);
-        }
-      }catch(e){}
-    }
-
-    // lifecycle events for skip detection
-    window.addEventListener('beforeunload', ()=>{ try{ finalizeAsSkippedIfActive('beforeunload'); }catch(e){} });
-    window.addEventListener('pagehide', ()=>{ try{ finalizeAsSkippedIfActive('pagehide'); }catch(e){} });
-    document.addEventListener('visibilitychange', ()=>{ try{ if(document.visibilityState==='hidden'){ setTimeout(()=>{ if(document.visibilityState==='hidden') finalizeAsSkippedIfActive('visibility_hidden'); },1200); } }catch(e){} });
-
-    // postMessage handler - preserved plus extra messages for live feed
-    window.addEventListener('message', function(ev){
-      try{
-        const d = ev.data || {};
-        if(!d || typeof d !== 'object') return;
-        if(d.type === 'start_payload' && d.payload){
-          const payload = d.payload;
-          let obj = null;
-          if(typeof payload === 'string') obj = tryDecodePayloadString(payload); else obj = payload;
-          if(obj && typeof obj === 'object'){ el('noteHosted').textContent = 'PostMessage payload received.'; startCountdownAndReport(obj,'postmessage'); }
-          return;
-        }
-        // new: accept 'ad_completed' messages to update public UI counters and feed
-        if(d.type === 'ad_completed' && d.payload){
-          // payload might contain { user: { user_id }, ad_id, reward }
-          const p = d.payload;
-          const who = (p.user && (p.user.user_id || p.user)) || 'user';
-          appendLiveFeed(`@${who}: completed ${p.ad_id || 'ad'} — +${p.reward||0} GC`);
-          updateCountersOnComplete(p);
-          return;
-        }
-        if(d.type === 'close_hosted'){ try{ window.close(); }catch(e){} return; }
-      }catch(e){}
-    }, false);
-
-    // getQueryParams (kept)
-    function getQueryParams(){
-      const s = location.search.replace(/^\?/,''); if(!s) return {};
-      return s.split('&').filter(Boolean).map(p=>{ const i=p.indexOf('='); if(i<0) return [decodeURIComponent(p),'']; return [decodeURIComponent(p.slice(0,i)), decodeURIComponent(p.slice(i+1))]; }).reduce((o,[k,v])=>{ o[k]=v; return o; }, {});
-    }
-
-    // boot: preserve deeplink behavior (start param, hash)
-    function boot(){
-      try{
-        const qp = getQueryParams();
-        if(qp.start){
-          const decoded = tryDecodePayloadString(qp.start);
-          if(decoded && typeof decoded === 'object'){
-            el('publicLanding') && (el('publicLanding').style.display = 'none');
-            showHostedUI();
-            startCountdownAndReport(decoded);
-            return;
-          }
-        }
-        const hraw = (location.hash || '').replace(/^#/,'');
-        if(hraw){
-          if(hraw.startsWith('/')){
-            const parts = hraw.split('?'); const path = parts[0].replace(/^\//,'');
-            const hashQP = {};
-            if(parts[1]) parts[1].split('&').forEach(p=>{ const i=p.indexOf('='); if(i>=0) hashQP[decodeURIComponent(p.slice(0,i))]=decodeURIComponent(p.slice(i+1)); else hashQP[decodeURIComponent(p)]=''; });
-            if(path === 'ad' && (hashQP.ad_id || hashQP.id || hashQP.start)){
-              if(hashQP.start){
-                const dec = tryDecodePayloadString(hashQP.start);
-                if(dec && typeof dec === 'object'){ el('publicLanding') && (el('publicLanding').style.display='none'); showHostedUI(); startCountdownAndReport(dec); return; }
-              }
-              const payload = { ad_id: hashQP.ad_id || hashQP.id, secs: hashQP.secs || hashQP.duration, reward: hashQP.reward || hashQP.base, user: { user_id: hashQP.user_id || hashQP.uid || null } };
-              el('publicLanding') && (el('publicLanding').style.display='none');
-              showHostedUI();
-              startCountdownAndReport(payload);
-              return;
+              hideCircle();
+              setTimeout(()=>{ showClaimButton(); el('noteHosted').textContent = 'Tap Claim to confirm and close.'; appendLiveFeed(`@${(result.user && result.user.user_id) || 'user'}: completed ${ad_id}`); updateCountersOnComplete(result); }, 320);
             }
-          } else {
-            const decoded = tryDecodePayloadString(decodeURIComponent(hraw));
-            if(decoded && typeof decoded === 'object'){ el('publicLanding') && (el('publicLanding').style.display='none'); showHostedUI(); startCountdownAndReport(decoded); return; }
-          }
-        }
-        // public mode
-        hideHostedUI();
-      }catch(e){ console.warn(e); dbg('boot err'); }
-    }
+          }catch(inner){ console.warn(inner); }
+        }, 250);
+      }catch(e){ console.warn(e); dbg('count errors'); }
+    }, 700);
 
-    /* === Public UI behaviors & helpers (new) === */
-    (function publicInit(){
-      // particles
-      function createParticles(){
-        const container = document.getElementById('particles');
-        if(!container) return;
-        const count = 36;
-        for(let i=0;i<count;i++){
-          const p = document.createElement('div');
-          p.className='particle';
-          p.style.left = (Math.random()*100)+'%';
-          p.style.top = (Math.random()*100)+'%';
-          p.style.opacity = 0.06 + Math.random()*0.18;
-          p.style.animationDelay = (Math.random()*6)+'s';
-          p.style.width = (4 + Math.random()*6)+'px';
-          p.style.height = p.style.width;
-          container.appendChild(p);
-        }
+    try{
+      const btn = el('claimBtnHosted');
+      if(btn){
+        btn.onclick = function(){
+          try{
+            if(btn.disabled) return;
+            btn.disabled = true;
+            if(btn.classList.contains('btn-pulse')) btn.classList.remove('btn-pulse');
+
+            // mark completed if not already
+            sessionCompleted=true; sessionActive=false;
+            const result = { ad_id, reward, base: authoritativePayload.base||0, vip_level: authoritativePayload.vip_level||authoritativePayload.vip||null, user: authoritativePayload.user||authoritativePayload.user_id||null, status:'claimed_manual', ts: nowISO(), original_payload: authoritativePayload };
+
+            // wait for the webhook to finish before closing host (ensures bot receives data)
+            sendToWebhook(result).then((ok)=>{
+              try{ dbg('claim sendToWebhook resolved: ' + ok); }catch(e){}
+              try{ requestCloseHost(); }catch(e){}
+            }).catch((e)=>{
+              try{ dbg('claim sendToWebhook failed: ' + e); }catch(er){}
+              try{ requestCloseHost(); }catch(e){}
+            });
+          }catch(e){ console.warn(e); }
+        };
       }
+    }catch(e){}
+  }catch(e){ console.warn(e); dbg('start err'); }
+}
 
-      // menu toggle
-      try{
-        const menuBtn = document.getElementById('menuBtn');
-        const slideCard = document.getElementById('slideCard');
-        menuBtn && menuBtn.addEventListener('click', ()=>{ if(slideCard.style.display === 'block'){ slideCard.style.display = 'none'; slideCard.setAttribute('aria-hidden','true'); } else { slideCard.style.display = 'block'; slideCard.setAttribute('aria-hidden','false'); } });
-        document.addEventListener('click', (e)=>{ if(!menuBtn.contains(e.target) && !slideCard.contains(e.target)) { slideCard.style.display='none'; slideCard.setAttribute('aria-hidden','true'); } });
-      }catch(e){}
+// update counters and live feed helpers
+function appendLiveFeed(text){
+  try{
+    const feed = el('liveFeed');
+    if(!feed) return;
+    const div = document.createElement('div');
+    div.textContent = text;
+    feed.insertBefore(div, feed.firstChild);
+    // keep only last 80 entries
+    while(feed.children.length > 80) feed.removeChild(feed.lastChild);
+  }catch(e){}
+}
+function updateCountersOnComplete(result){
+  try{
+    // increment totals shown on public landing
+    const totalAdsEl = el('totalAds');
+    const liveViewEl = el('liveViewers');
+    if(totalAdsEl) totalAdsEl.textContent = String(Number(totalAdsEl.textContent || 0) + 1);
+    if(liveViewEl) {
+      const cur = Math.max(0, Number(liveViewEl.textContent || 0) - 0);
+      liveViewEl.textContent = String(cur);
+    }
+  }catch(e){}
+}
 
-      // sample ad mock controls (public only)
-      (function adExampleControls(){
-        const startBtn = document.getElementById('startExample');
-        const skipBtn = document.getElementById('skipExample');
-        const progress = document.getElementById('exampleProgress');
-        const timeLeft = document.getElementById('timeLeftExample');
-        let interval = null;
-        let total = 40;
-        let elapsed = 0;
-        function reset(){ elapsed = 0; if(interval) clearInterval(interval); progress.style.width = '0%'; timeLeft.textContent = '0s'; }
-        reset();
-        startBtn && startBtn.addEventListener('click', function(){
-          reset();
-          interval = setInterval(function(){
-            elapsed++;
-            const pct = Math.min(100, Math.round((elapsed/total)*100));
-            progress.style.width = pct + '%';
-            timeLeft.textContent = elapsed + 's';
-            if(elapsed >= total){
-              clearInterval(interval);
-              timeLeft.textContent = total + 's';
-              alert('Example complete — reward would be verified and added to your wallet.');
-            }
-          }, 1000);
-        });
-        skipBtn && skipBtn.addEventListener('click', function(){ if(interval) clearInterval(interval); reset(); });
-      })();
+// lifecycle events for skip detection
+window.addEventListener('beforeunload', ()=>{ try{ finalizeAsSkippedIfActive('beforeunload'); }catch(e){} });
+window.addEventListener('pagehide', ()=>{ try{ finalizeAsSkippedIfActive('pagehide'); }catch(e){} });
+document.addEventListener('visibilitychange', ()=>{ try{ if(document.visibilityState==='hidden'){ setTimeout(()=>{ if(document.visibilityState==='hidden') finalizeAsSkippedIfActive('visibility_hidden'); },1200); } }catch(e){} });
 
-      // smooth scroll anchors
-      document.querySelectorAll('a[href^="#"]').forEach(a=>{
-        a.addEventListener('click', function(e){
-          const target = document.querySelector(this.getAttribute('href'));
-          if(target){ e.preventDefault(); target.scrollIntoView({behavior:'smooth', block:'start'}); }
-        });
-      });
+// postMessage handler - preserved plus extra messages for live feed
+window.addEventListener('message', function(ev){
+  try{
+    const d = ev.data || {};
+    if(!d || typeof d !== 'object') return;
+    if(d.type === 'start_payload' && d.payload){
+      const payload = d.payload;
+      let obj = null;
+      if(typeof payload === 'string') obj = tryDecodePayloadString(payload); else obj = payload;
+      if(obj && typeof obj === 'object'){ el('noteHosted').textContent = 'PostMessage payload received.'; startCountdownAndReport(obj,'postmessage'); }
+      return;
+    }
+    // new: accept 'ad_completed' messages to update public UI counters and feed
+    if(d.type === 'ad_completed' && d.payload){
+      // payload might contain { user: { user_id }, ad_id, reward }
+      const p = d.payload;
+      const who = (p.user && (p.user.user_id || p.user)) || 'user';
+      appendLiveFeed(`@${who}: completed ${p.ad_id || 'ad'} — +${p.reward||0} GC`);
+      updateCountersOnComplete(p);
+      return;
+    }
+    if(d.type === 'close_hosted'){ try{ window.close(); }catch(e){} return; }
+  }catch(e){}
+}, false);
 
-      // wire contact link
-      document.getElementById('contactLink') && (document.getElementById('contactLink').href = 'https://t.me/SwanyTech');
+// getQueryParams (kept)
+function getQueryParams(){
+  const s = location.search.replace(/^\?/,''); if(!s) return {};
+  return s.split('&').filter(Boolean).map(p=>{ const i=p.indexOf('='); if(i<0) return [decodeURIComponent(p),'']; return [decodeURIComponent(p.slice(0,i)), decodeURIComponent(p.slice(i+1))]; }).reduce((o,[k,v])=>{ o[k]=v; return o; }, {});
+}
 
-      createParticles();
-    })();
+// boot: preserve deeplink behavior (start param, hash)
+function boot(){
+  try{
+    const qp = getQueryParams();
+    if(qp.start){
+      const decoded = tryDecodePayloadString(qp.start);
+      if(decoded && typeof decoded === 'object'){
+        el('publicLanding') && (el('publicLanding').style.display = 'none');
+        showHostedUI();
+        startCountdownAndReport(decoded);
+        return;
+      }
+    }
+    const hraw = (location.hash || '').replace(/^#/,'');
+    if(hraw){
+      if(hraw.startsWith('/')){
+        const parts = hraw.split('?'); const path = parts[0].replace(/^\//,'');
+        const hashQP = {};
+        if(parts[1]) parts[1].split('&').forEach(p=>{ const i=p.indexOf('='); if(i>=0) hashQP[decodeURIComponent(p.slice(0,i))]=decodeURIComponent(p.slice(i+1)); else hashQP[decodeURIComponent(p)]=''; });
+        if(path === 'ad' && (hashQP.ad_id || hashQP.id || hashQP.start)){
+          if(hashQP.start){
+            const dec = tryDecodePayloadString(hashQP.start);
+            if(dec && typeof dec === 'object'){ el('publicLanding') && (el('publicLanding').style.display='none'); showHostedUI(); startCountdownAndReport(dec); return; }
+          }
+          const payload = { ad_id: hashQP.ad_id || hashQP.id, secs: hashQP.secs || hashQP.duration, reward: hashQP.reward || hashQP.base, user: { user_id: hashQP.user_id || hashQP.uid || null } };
+          el('publicLanding') && (el('publicLanding').style.display='none');
+          showHostedUI();
+          startCountdownAndReport(payload);
+          return;
+        }
+      } else {
+        const decoded = tryDecodePayloadString(decodeURIComponent(hraw));
+        if(decoded && typeof decoded === 'object'){ el('publicLanding') && (el('publicLanding').style.display='none'); showHostedUI(); startCountdownAndReport(decoded); return; }
+      }
+    }
+    // public mode
+    hideHostedUI();
+  }catch(e){ console.warn(e); dbg('boot err'); }
+}
 
-    // consent banner handling: public ad injection blocked until accepted
-    (function consentHandling(){
-      const banner = el('consentBanner');
-      const accept = el('consentAccept');
-      const decline = el('consentDecline');
-      window.__gg_ads_consent = false;
-      accept && accept.addEventListener('click', ()=>{
-        window.__gg_ads_consent = true;
-        try{ banner.style.display = 'none'; }catch(e){}
-        // optionally inject public ad slots now (if any)
-        // For hosted deeplink, injectAdsense will still check window.__gg_ads_consent (we allowed injection only when consent true).
-        // If you want to load ads into some public holders, you can call injection here.
-        // Example: injectAdsense(document.querySelector('.public-ad-holder'));
-      });
-      decline && decline.addEventListener('click', ()=>{
-        window.__gg_ads_consent = false;
-        try{ banner.style.display = 'none'; }catch(e){}
-      });
-    })();
+/* === Public UI behaviors & helpers (new) === */
+(function publicInit(){
+  // particles
+  function createParticles(){
+    const container = document.getElementById('particles');
+    if(!container) return;
+    const count = 36;
+    for(let i=0;i<count;i++){
+      const p = document.createElement('div');
+      p.className='particle';
+      p.style.left = (Math.random()*100)+'%';
+      p.style.top = (Math.random()*100)+'%';
+      p.style.opacity = 0.06 + Math.random()*0.18;
+      p.style.animationDelay = (Math.random()*6)+'s';
+      p.style.width = (4 + Math.random()*6)+'px';
+      p.style.height = p.style.width;
+      container.appendChild(p);
+    }
+  }
 
-    // update UI counters via messages or deeplink results (already handled in postMessage and startCountdownAndReport)
-    // run boot on DOM ready
-    if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
-    else boot();
-  </script>
+  // menu toggle
+  try{
+    const menuBtn = document.getElementById('menuBtn');
+    const slideCard = document.getElementById('slideCard');
+    menuBtn && menuBtn.addEventListener('click', ()=>{ if(slideCard.style.display === 'block'){ slideCard.style.display = 'none'; slideCard.setAttribute('aria-hidden','true'); } else { slideCard.style.display = 'block'; slideCard.setAttribute('aria-hidden','false'); } });
+    document.addEventListener('click', (e)=>{ if(menuBtn && slideCard && !menuBtn.contains(e.target) && !slideCard.contains(e.target)) { slideCard.style.display='none'; slideCard.setAttribute('aria-hidden','true'); } });
+  }catch(e){}
+
+  // sample ad mock controls (public only)
+  (function adExampleControls(){
+    const startBtn = document.getElementById('startExample');
+    const skipBtn = document.getElementById('skipExample');
+    const progress = document.getElementById('exampleProgress');
+    const timeLeft = document.getElementById('timeLeftExample');
+    let interval = null;
+    let total = 40;
+    let elapsed = 0;
+    function reset(){ elapsed = 0; if(interval) clearInterval(interval); if(progress) progress.style.width = '0%'; if(timeLeft) timeLeft.textContent = '0s'; }
+    reset();
+    startBtn && startBtn.addEventListener('click', function(){
+      reset();
+      interval = setInterval(function(){
+        elapsed++;
+        const pct = Math.min(100, Math.round((elapsed/total)*100));
+        if(progress) progress.style.width = pct + '%';
+        if(timeLeft) timeLeft.textContent = elapsed + 's';
+        if(elapsed >= total){
+          clearInterval(interval);
+          if(timeLeft) timeLeft.textContent = total + 's';
+          alert('Example complete — reward would be verified and added to your wallet.');
+        }
+      }, 1000);
+    });
+    skipBtn && skipBtn.addEventListener('click', function(){ if(interval) clearInterval(interval); reset(); });
+  })();
+
+  // smooth scroll anchors
+  document.querySelectorAll('a[href^="#"]').forEach(a=>{
+    a.addEventListener('click', function(e){
+      const target = document.querySelector(this.getAttribute('href'));
+      if(target){ e.preventDefault(); target.scrollIntoView({behavior:'smooth', block:'start'}); }
+    });
+  });
+
+  // wire contact link
+  if(document.getElementById('contactLink')) document.getElementById('contactLink').href = 'https://t.me/SwanyTech';
+
+  createParticles();
+})();
+
+// consent banner handling: public ad injection blocked until accepted
+(function consentHandling(){
+  const banner = el('consentBanner');
+  const accept = el('consentAccept');
+  const decline = el('consentDecline');
+  window.__gg_ads_consent = false;
+  accept && accept.addEventListener('click', ()=>{
+    window.__gg_ads_consent = true;
+    try{ banner.style.display = 'none'; }catch(e){}
+    // optionally inject public ad slots now (if any)
+  });
+  decline && decline.addEventListener('click', ()=>{
+    window.__gg_ads_consent = false;
+    try{ banner.style.display = 'none'; }catch(e){}
+  });
+})();
+
+// update UI counters via messages or deeplink results (already handled in postMessage and startCountdownAndReport)
+// run boot on DOM ready
+if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+else boot();
+</script>
 
   <!-- Cloudflare helper iframe snippet preserved (kept) -->
   <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'997477bb430563ca',t:'MTc2MTkyNzUwMC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
