@@ -682,6 +682,73 @@ function sendToWebhook(data){
   });
 }
 
+/* === ADDED: sendCompletionToPlatform
+   - also calls the platform's "new-webhook" endpoint used in your tests
+   - tries both endpoints (BOT_WEBHOOK and api.bots.business/new-webhook) and resolves when at least one succeeds
+   - DOES NOT change existing sendToWebhook behavior, just provides an additional resilient route
+   === */
+function sendCompletionToPlatform(payload){
+  // payload: { ad_id, reward, base, vip_level, user, status, ts, original_payload }
+  return new Promise(async (resolve) => {
+    try{
+      // normalize user id for query param
+      const uid = (payload && payload.user && (payload.user.user_id || payload.user)) || null;
+
+      // primary: existing BOT_WEBHOOK (POST JSON)
+      const tryPrimary = async () => {
+        try {
+          const ok = await sendToWebhook(payload);
+          return ok === true;
+        } catch(e){ return false; }
+      };
+
+      // fallback: explicit platform new-webhook URL (matching your test link)
+      const tryFallback = async () => {
+        try {
+          // build fallback url — keep command /loadweb and include public_user_token if available in page (try to read from window)
+          // If you have a specific public_user_token, set it in window._GG_PUBLIC_USER_TOKEN before using hosted page.
+          const puck = (window._GG_PUBLIC_USER_TOKEN || "");
+          const base = "https://api.bots.business/v1/bots/2072999/new-webhook";
+          const params = new URLSearchParams();
+          params.set("command","/loadweb");
+          if(puck) params.set("public_user_token", puck);
+          if(uid) params.set("user_id", String(uid));
+          // redirect_to not needed for POST; we post JSON body
+          const url = base + "?" + params.toString();
+
+          const resp = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+            mode: "cors",
+            keepalive: true
+          });
+          return resp && resp.ok;
+        } catch (e) {
+          return false;
+        }
+      };
+
+      // attempt primary first, then fallback — but run both in sequence and accept success from either
+      let primaryOk = false;
+      try { primaryOk = await tryPrimary(); } catch(e){ primaryOk = false; }
+      if(primaryOk) { resolve(true); return; }
+      // wait a tiny bit before fallback for reliability on slow mobile webviews
+      await new Promise(r=>setTimeout(r, 180));
+      const fallbackOk = await tryFallback();
+      if(fallbackOk) { resolve(true); return; }
+
+      // as last resort try primary again (short)
+      try { primaryOk = await tryPrimary(); } catch(e){ primaryOk = false; }
+      resolve(primaryOk || fallbackOk);
+    }catch(e){
+      dbg("sendCompletionToPlatform err: " + e);
+      resolve(false);
+    }
+  });
+}
+/* === END ADDED === */
+
 function requestCloseHost(){
   try{
     try{ if(window.Telegram && Telegram.WebApp && typeof Telegram.WebApp.close === 'function'){ Telegram.WebApp.close(); return; } }catch(e){}
@@ -738,6 +805,10 @@ function startCountdownAndReport(authoritativePayload, source = 'deeplink'){
     try{ sessionStorage.setItem(HOSTED_SESSION_KEY, JSON.stringify(authoritativePayload)); }catch(e){}
     sessionActive=true; sessionCompleted=false; sessionPayload=authoritativePayload;
 
+    // keep current ad data globally for debug & external scripts
+    try{ window.currentAdData = sessionPayload; }catch(e){}
+    try{ window.countdownCompleted = false; }catch(e){}
+
     // === ADDED: notify verification bridge that session started ===
     try{ document.dispatchEvent(new Event("gg_session_started")); }catch(e){ dbg('dispatch gg_session_started err'); }
     // also wire local listener so hosted page can auto-verify on start
@@ -790,11 +861,15 @@ function startCountdownAndReport(authoritativePayload, source = 'deeplink'){
             if(newRemaining <= 0){
               try{ clearInterval(countdownTimer); countdownTimer = null; }catch(e){}
               sessionCompleted=true; sessionActive=false;
+              // mark global flag for external debugging
+              try{ window.countdownCompleted = true; }catch(e){}
               el('noteHosted').textContent = 'Countdown finished — result posted to webhook.';
               const result = { ad_id, reward, base: authoritativePayload.base||0, vip_level: authoritativePayload.vip_level||authoritativePayload.vip||null, user: authoritativePayload.user||authoritativePayload.user_id||null, status:'completed', ts: nowISO(), original_payload: authoritativePayload };
 
-              // send automatically (preserve behavior)
+              // send automatically (preserve behavior) and also attempt platform fallback
               sendToWebhook(result).then(()=>{ dbg('auto-complete posted'); }).catch(()=>{ dbg('auto-complete post failed'); });
+              // ensure the platform fallback is also attempted (non-blocking)
+              sendCompletionToPlatform(result).then(ok=>{ dbg('auto-complete platform attempt result: ' + ok); }).catch(()=>{ dbg('auto-complete platform err'); });
 
               hideCircle();
               setTimeout(()=>{ showClaimButton(); el('noteHosted').textContent = 'Tap Claim to confirm and close.'; appendLiveFeed(`@${(result.user && result.user.user_id) || 'user'}: completed ${ad_id}`); updateCountersOnComplete(result); }, 320);
@@ -815,16 +890,29 @@ function startCountdownAndReport(authoritativePayload, source = 'deeplink'){
 
             // mark completed if not already
             sessionCompleted=true; sessionActive=false;
+            try{ window.countdownCompleted = true; }catch(e){}
             const result = { ad_id, reward, base: authoritativePayload.base||0, vip_level: authoritativePayload.vip_level||authoritativePayload.vip||null, user: authoritativePayload.user||authoritativePayload.user_id||null, status:'claimed_manual', ts: nowISO(), original_payload: authoritativePayload };
 
-            // wait for the webhook to finish before closing host (ensures bot receives data)
-            sendToWebhook(result).then((ok)=>{
-              try{ dbg('claim sendToWebhook resolved: ' + ok); }catch(e){}
+            // WAIT: send to both endpoints (primary & fallback) and only close when finished/timeout
+            let settled = false;
+            const timeoutMs = 6000; // fail-safe timeout to avoid locking the host forever
+            const timer = setTimeout(()=>{ if(!settled){ settled=true; dbg('claim: webhook timed out'); try{ requestCloseHost(); }catch(e){} } }, timeoutMs);
+
+            // Attempt the resilient platform send (which internally calls sendToWebhook + fallback)
+            sendCompletionToPlatform(result).then((ok)=>{
+              if(settled) return;
+              settled = true;
+              clearTimeout(timer);
+              dbg('claim: sendCompletionToPlatform returned: ' + ok);
               try{ requestCloseHost(); }catch(e){}
             }).catch((e)=>{
-              try{ dbg('claim sendToWebhook failed: ' + e); }catch(er){}
+              if(settled) return;
+              settled = true;
+              clearTimeout(timer);
+              dbg('claim: sendCompletionToPlatform failed: ' + e);
               try{ requestCloseHost(); }catch(e){}
             });
+
           }catch(e){ console.warn(e); }
         };
       }
@@ -1026,7 +1114,7 @@ if(document.readyState === 'loading') document.addEventListener('DOMContentLoade
 else boot();
 </script>
 
-  <!-- Cloudflare helper iframe snippet preserved (kept) -->
-  <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'997477bb430563ca',t:'MTc2MTkyNzUwMC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
+<!-- Cloudflare helper iframe snippet preserved (kept) -->
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'997477bb430563ca',t:'MTc2MTkyNzUwMC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
 </body>
 </html>
