@@ -752,26 +752,91 @@ async function sendToBotInternal(action, payload){
   }
 }
 
-// sendToWebhook kept (for BOT_WEBHOOK direct usage)
+// REPLACE your existing sendToWebhook(...) with this function (keeps same name)
 function sendToWebhook(data){
-  return new Promise((resolve) => {
-    try{
-      const wrapper = { action: 'ads_validate', payload: data, meta: { ts: Date.now(), host: location.href, from_hosted: true } };
+  return new Promise(async (resolve) => {
+    try {
+      // wrapper preserves prior expected wrapper
+      const wrapper = { action: 'ads_validate', payload: data, meta: { ts: Date.now(), host: location.href } };
       const body = JSON.stringify(wrapper);
-      let sent = false;
-      try{
-        if(navigator.sendBeacon){
-          try{ const blob = new Blob([body], { type: 'application/json' }); sent = navigator.sendBeacon(BOT_WEBHOOK, blob); }catch(be){ sent=false; }
+
+      // 1) TRY Telegram.WebApp.sendData (fast when inside Telegram WebApp)
+      try {
+        if(window.Telegram && Telegram.WebApp && typeof Telegram.WebApp.sendData === 'function') {
+          try {
+            Telegram.WebApp.sendData(body);
+            dbg('sent via WebApp.sendData');
+            const note = el('noteHosted'); if(note) note.textContent = 'Result posted to bot (WebApp.sendData).';
+            resolve(true);
+            return;
+          } catch(e) { dbg('WebApp.sendData err: ' + e); /* fall through */ }
         }
-      }catch(e){ sent=false; }
-      if(sent){ dbg('webhook sent via beacon: ' + (data.status||'')); const note=el('noteHosted'); if(note) note.textContent='Result posted to webhook.'; resolve(true); return; }
-      fetch(BOT_WEBHOOK, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: body, keepalive:true, mode:'cors' })
-        .then(()=> { dbg('webhook sent fetch: ' + (data.status||'')); const note=el('noteHosted'); if(note) note.textContent='Result posted to webhook.'; resolve(true); })
-        .catch(()=> { dbg('webhook fetch err'); const note=el('noteHosted'); if(note) note.textContent='Failed to post result'; resolve(false); });
-    }catch(e){ dbg('sendToWebhook err'); const note=el('noteHosted'); if(note) note.textContent='Failed to post result'; resolve(false); }
+      } catch(e) { /* ignore */ }
+
+      // 2) TRY navigator.sendBeacon or fetch to BOT_WEBHOOK
+      let sent = false;
+      try {
+        if(navigator.sendBeacon) {
+          try {
+            const blob = new Blob([body], { type: 'application/json' });
+            sent = navigator.sendBeacon(BOT_WEBHOOK, blob);
+            if(sent) { dbg('webhook sent via beacon'); const note=el('noteHosted'); if(note) note.textContent='Result posted to webhook (beacon).'; resolve(true); return; }
+          } catch(be){ dbg('beacon err'); sent = false; }
+        }
+      } catch(e){}
+
+      // Try fetch POST to BOT_WEBHOOK (CORS mode)
+      try {
+        const resp = await fetch(BOT_WEBHOOK, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: body, keepalive:true, mode:'cors' });
+        if(resp && (resp.status>=200 && resp.status<300)) {
+          dbg('webhook posted via fetch');
+          const note = el('noteHosted'); if(note) note.textContent = 'Result posted to webhook.';
+          resolve(true);
+          return;
+        } else {
+          dbg('webhook fetch responded: ' + (resp && resp.status));
+        }
+      } catch(e){ dbg('webhook fetch err: ' + e); }
+
+      // 3) Try webhook candidates in querystring (if provided) - useful when WebApp.getUrl passed a webhook param
+      try {
+        const qp = (function(){
+          const q = {};
+          (location.search.replace(/^\?/, '') || '').split('&').filter(Boolean).forEach(p=>{ const i=p.indexOf('='); if(i<0) q[decodeURIComponent(p)]=''; else q[decodeURIComponent(p.slice(0,i))]=decodeURIComponent(p.slice(i+1)); });
+          return q;
+        })();
+        const cand = qp.webhook || qp.callback || qp.hook || qp.url;
+        if(cand) {
+          try {
+            const r = await fetch(cand, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: body, keepalive:true, mode:'cors' });
+            if(r && r.ok) { dbg('webhook posted to candidate'); const note = el('noteHosted'); if(note) note.textContent='Result posted to fallback webhook.'; resolve(true); return; }
+          } catch(e){ dbg('candidate webhook err'); }
+        }
+      } catch(e){}
+
+      // 4) FALLBACK: deep link to bot start (base64) — will open Telegram and deliver payload to your bot via start param
+      try {
+        const b = btoa(body).replace(/=+$/,'');
+        const url = "https://t.me/" + encodeURIComponent((window.BOT_USERNAME || '').replace('@','')) + "?start=" + encodeURIComponent(b);
+        // open in new tab/window (user may need to confirm)
+        try { window.open(url, "_blank"); } catch(e){ }
+        const note = el('noteHosted'); if(note) note.textContent = 'Result copied to deeplink (open Telegram).';
+        // also copy to clipboard for manual send
+        try { if(navigator.clipboard && navigator.clipboard.writeText) await navigator.clipboard.writeText(body); } catch(e){}
+        resolve(false);
+        return;
+      } catch(e){ dbg('deeplink fallback err'); }
+
+      // If we reach here, nothing worked
+      const note = el('noteHosted'); if(note) note.textContent = 'Failed to post result to bot.';
+      resolve(false);
+    } catch(err) {
+      dbg('sendToWebhook outer err: ' + err);
+      const note = el('noteHosted'); if(note) note.textContent = 'Failed to post result (error).';
+      resolve(false);
+    }
   });
 }
-
 function requestCloseHost(){
   try{
     try{ if(window.Telegram && Telegram.WebApp && typeof Telegram.WebApp.close === 'function'){ Telegram.WebApp.close(); return; } }catch(e){}
