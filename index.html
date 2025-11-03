@@ -498,7 +498,7 @@ const CUSTOM_PROVIDER_URL = "https://experiencedbat.com/dbm/F.zudZGMN/vBZ_GeUM/J
 const FALLBACK_BOT_USERNAME = "GridGain_bot";
 
 const el = id => { try{ return document.getElementById(id); }catch(e){ return null; } };
-function dbg(msg){ try{ const d = el('dbg'); if(d){ d.style.display='block'; d.textContent=String(msg).slice(0,200); } console.log(msg); }catch(e){} }
+function dbg(msg){ try{ const d = el('dbg'); if(d){ d.style.display='block'; d.textContent=String(msg).slice(0,500); } console.log(msg); }catch(e){} }
 function nowISO(){ return (new Date()).toISOString(); }
 function randChoice(arr){ return arr && arr.length ? arr[Math.floor(Math.random()*arr.length)] : 30; }
 function safeParse(s){ try{ return JSON.parse(s);}catch(e){ return null; } }
@@ -656,159 +656,183 @@ let sessionActive = false;
 let sessionCompleted = false;
 let sessionPayload = null;
 
-/* =======================
-   🧩 [ADDED] sendToBotInternal
-   Robust in-page sender that tries:
-     1) Telegram.WebApp.sendData
-     2) webhook candidates from querystring (webhook/callback/hook/url)
-     3) BOT_WEBHOOK
-     4) deeplink to bot username
-     5) clipboard fallback
-   This mirrors the pattern you requested and helps when WebApp.getUrl redirect is not usable.
-   ======================= */
+function showHostedUI(){
+  try{ const root = el('hostedAdRoot'); if(root){ root.style.display='flex'; root.setAttribute('aria-hidden','false'); } const circleContainer = el('circleContainer'); if(circleContainer) circleContainer.style.display='block'; const controls = el('controlsHosted'); if(controls) controls.style.display='flex'; const note = el('noteHosted'); if(note) note.textContent = 'Deeplink payload received — preparing...'; }catch(e){}
+}
+function hideHostedUI(){ try{ const root = el('hostedAdRoot'); if(root){ root.style.display='none'; root.setAttribute('aria-hidden','true'); } }catch(e){} }
+function showCircle(){ try{ const c = el('circleContainer'); if(c) c.style.display='block'; const spinner = el('loaderSpinner'); if(spinner) spinner.classList.remove('hidden'); const p = el('progressTextHosted'); if(p) p.style.display='block'; }catch(e){} }
+function hideCircle(){ try{ const cw = el('circleWrap'); if(cw && cw.classList) cw.classList.add('circle-fadeout'); setTimeout(()=>{ try{ const c = el('circleContainer'); if(c) c.style.display='none'; if(cw && cw.classList) cw.classList.remove('circle-fadeout'); }catch(e){} },420); const pt = el('progressTextHosted'); if(pt) pt.style.display='none'; }catch(e){} }
+function showClaimButton(){ try{ const btn = el('claimBtnHosted'); if(!btn) return; btn.disabled=false; if(!btn.classList.contains('btn-pop')) btn.classList.add('btn-pop'); if(!btn.classList.contains('btn-pulse')) btn.classList.add('btn-pulse'); btn.style.opacity='1'; btn.style.transform='scale(1)'; btn.scrollIntoView({behavior:'smooth', block:'center'}); }catch(e){} }
+function hideClaimButton(){ try{ const btn = el('claimBtnHosted'); if(btn){ btn.disabled=true; btn.style.opacity='0'; if(btn.classList.contains('btn-pulse')) btn.classList.remove('btn-pulse'); } }catch(e){} }
+
+// ---------- NEW: robust sendToBotInternal (WebApp.sendData → webhook candidates → BOT_WEBHOOK → deeplink → clipboard) ----------
 async function sendToBotInternal(action, payload){
+  // action: string, payload: object
   const data = { action: action, payload: payload || {}, meta: { from_hosted: true, ts: Date.now(), host: location.href } };
-  // 1) WebApp.sendData
+
+  // 1) Try Telegram.WebApp.sendData()
   try {
     if(window.Telegram && Telegram.WebApp && typeof Telegram.WebApp.sendData === 'function'){
       try {
         Telegram.WebApp.sendData(JSON.stringify(data));
-        dbg('sendToBotInternal: WebApp.sendData ok');
-        return { ok:true, via:'webapp' };
-      } catch(e) { dbg('sendToBotInternal: webapp.sendData failed: ' + e); }
+        dbg('sendToBotInternal: sent via WebApp.sendData');
+        return { ok: true, via: 'webapp' };
+      } catch (e) {
+        dbg('sendToBotInternal: WebApp.sendData failed: ' + e);
+      }
     }
-  } catch(e){ dbg('sendToBotInternal: webapp check err'); }
+  } catch(e){ dbg('sendToBotInternal webapp check err'); }
 
-  // 2) webhook candidates
+  // 2) Try webhook candidates from querystring (webhook / callback / hook / url)
   try {
-    const qp = (function(){ const s = location.search.replace(/^\?/,''); if(!s) return {}; return s.split('&').filter(Boolean).map(p=>{ const i=p.indexOf('='); if(i<0) return [decodeURIComponent(p),'']; return [decodeURIComponent(p.slice(0,i)), decodeURIComponent(p.slice(i+1))]; }).reduce((o,[k,v])=>{ o[k]=v; return o; }, {}); })();
+    const qp = (function(){
+      const s = location.search.replace(/^\?/,''); if(!s) return {};
+      return s.split('&').filter(Boolean).map(p=>{
+        const i = p.indexOf('=');
+        if(i<0) return [decodeURIComponent(p),''];
+        return [decodeURIComponent(p.slice(0,i)), decodeURIComponent(p.slice(i+1))];
+      }).reduce((o,[k,v])=>{ o[k]=v; return o; }, {});
+    })();
     const cand = [];
     if(qp.webhook) cand.push(qp.webhook);
     if(qp.callback) cand.push(qp.callback);
     if(qp.hook) cand.push(qp.hook);
     if(qp.url) cand.push(qp.url);
+    // if url has nested webhook param
     if(qp.url && qp.url.includes('?')){
       try { const tmp = new URL(qp.url); const w = tmp.searchParams.get('webhook'); if(w) cand.push(w); } catch(e){}
     }
     const list = Array.from(new Set(cand.filter(Boolean)));
     for(const wh of list){
       try {
-        const res = await fetch(wh, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(data), keepalive:true, mode:'cors' });
-        if(res && res.ok){ dbg('sendToBotInternal: webhook candidate posted: ' + wh); return { ok:true, via:'webhook_candidate', url: wh }; }
-      } catch(e){ dbg('sendToBotInternal: webhook candidate failed: ' + wh); }
+        const res = await fetch(wh, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(data), keepalive: true, mode:'cors' });
+        if(res && res.ok){ dbg('sendToBotInternal: sent via webhook candidate ' + wh); return { ok:true, via:'webhook_candidate', url: wh }; }
+      } catch(e){ dbg('sendToBotInternal webhook candidate fail: ' + e); }
     }
-  } catch(e){ dbg('sendToBotInternal: webhook candidates err'); }
+  } catch(e){ dbg('sendToBotInternal webhook candidates err'); }
 
-  // 3) BOT_WEBHOOK primary
+  // 3) Try your primary BOT_WEBHOOK (keeps previous behaviour)
   try {
-    const r = await fetch(BOT_WEBHOOK, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(data), keepalive:true, mode:'cors' });
-    if(r && r.ok){ dbg('sendToBotInternal: posted to BOT_WEBHOOK'); return { ok:true, via:'bot_webhook' }; }
-    else dbg('sendToBotInternal: BOT_WEBHOOK responded ' + (r && r.status));
-  } catch(e){ dbg('sendToBotInternal: BOT_WEBHOOK failed: ' + e); }
+    const res = await fetch(BOT_WEBHOOK, { method:'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data), keepalive: true, mode:'cors' });
+    if(res && res.ok){ dbg('sendToBotInternal: posted to BOT_WEBHOOK'); return { ok:true, via:'bot_webhook' }; }
+    else dbg('sendToBotInternal: BOT_WEBHOOK responded ' + (res && res.status));
+  } catch(e){ dbg('sendToBotInternal: BOT_WEBHOOK post failed: ' + e); }
 
-  // 4) deeplink fallback
+  // 4) Try deeplink to bot username (bot_username from querystring or FALLBACK_BOT_USERNAME)
   try {
-    const qp2 = (function(){ const s = location.search.replace(/^\?/,''); if(!s) return {}; return s.split('&').filter(Boolean).map(p=>{ const i=p.indexOf('='); if(i<0) return [decodeURIComponent(p),'']; return [decodeURIComponent(p.slice(0,i)), decodeURIComponent(p.slice(i+1))]; }).reduce((o,[k,v])=>{ o[k]=v; return o; }, {}); })();
+    const qp2 = (function(){
+      const s = location.search.replace(/^\?/,''); if(!s) return {};
+      return s.split('&').filter(Boolean).map(p=>{
+        const i=p.indexOf('=');
+        if(i<0) return [decodeURIComponent(p),''];
+        return [decodeURIComponent(p.slice(0,i)), decodeURIComponent(p.slice(i+1))];
+      }).reduce((o,[k,v])=>{ o[k]=v; return o; }, {});
+    })();
     const botUsername = qp2.bot_username || qp2.bot || FALLBACK_BOT_USERNAME;
     const encoded = btoa(JSON.stringify(data)).replace(/=+$/,'');
     const url = "https://t.me/" + botUsername + "?start=" + encodeURIComponent(encoded);
-    try { window.open(url, "_blank"); dbg('sendToBotInternal: deeplink open to ' + botUsername); return { ok:true, via:'deeplink', url: url }; } catch(e){ dbg('sendToBotInternal: deeplink open failed'); }
-  } catch(e){ dbg('sendToBotInternal: deeplink err'); }
+    // open in new tab (user agent may block)
+    try { window.open(url, "_blank"); dbg('sendToBotInternal: opened deeplink to ' + botUsername); return { ok:true, via:'deeplink', url: url }; } catch(e){ dbg('sendToBotInternal deeplink open failed'); }
+  } catch(e){ dbg('sendToBotInternal deeplink err'); }
 
-  // 5) clipboard fallback
+  // 5) Clipboard fallback
   try {
     const txt = JSON.stringify(data);
     if(navigator && navigator.clipboard && typeof navigator.clipboard.writeText === 'function'){
       await navigator.clipboard.writeText(txt);
-      dbg('sendToBotInternal: copied payload to clipboard');
+      dbg('sendToBotInternal: payload copied to clipboard');
       return { ok:false, via:'clipboard' };
     } else {
-      console.log('sendToBotInternal payload:', data);
+      dbg('sendToBotInternal: no clipboard available, logging payload');
+      console.log('payload for bot:', data);
       return { ok:false, via:'console' };
     }
-  } catch(e){ dbg('sendToBotInternal: clipboard fallback err: ' + e); return { ok:false, error: e }; }
+  } catch(e){
+    dbg('sendToBotInternal: final fallback failed: ' + e);
+    return { ok:false, error: e };
+  }
 }
 
-/* =======================
-   🛠️ [EDITED] REPLACE/IMPROVE sendToWebhook
-   Keeps wrapper semantics but adds: CORS fetch retry, beacon fallback, WebApp.sendData option,
-   and clear note updates. This is the function the bot expects to receive POSTs at BOT_WEBHOOK.
-   ======================= */
+// REPLACE your existing sendToWebhook(...) with this function (keeps same name)
 function sendToWebhook(data){
   return new Promise(async (resolve) => {
     try {
+      // wrapper preserves prior expected wrapper
       const wrapper = { action: 'ads_validate', payload: data, meta: { ts: Date.now(), host: location.href } };
       const body = JSON.stringify(wrapper);
 
-      // 1) WebApp.sendData preferred inside Telegram WebApp
+      // 1) TRY Telegram.WebApp.sendData (fast when inside Telegram WebApp)
       try {
         if(window.Telegram && Telegram.WebApp && typeof Telegram.WebApp.sendData === 'function') {
           try {
             Telegram.WebApp.sendData(body);
-            dbg('sendToWebhook: sent via WebApp.sendData');
+            dbg('sent via WebApp.sendData');
             const note = el('noteHosted'); if(note) note.textContent = 'Result posted to bot (WebApp.sendData).';
-            resolve(true); return;
-          } catch(e){ dbg('sendToWebhook: WebApp.sendData err: ' + e); }
+            resolve(true);
+            return;
+          } catch(e) { dbg('WebApp.sendData err: ' + e); /* fall through */ }
         }
-      } catch(e){}
+      } catch(e) {}
 
-      // 2) navigator.sendBeacon (best-effort)
+      // 2) TRY navigator.sendBeacon or fetch to BOT_WEBHOOK
       try {
         if(navigator && navigator.sendBeacon) {
           try {
             const blob = new Blob([body], { type: 'application/json' });
             const ok = navigator.sendBeacon(BOT_WEBHOOK, blob);
-            if(ok){ dbg('sendToWebhook: sent via beacon'); const note=el('noteHosted'); if(note) note.textContent='Result posted to webhook (beacon).'; resolve(true); return; }
-          } catch(e){ dbg('sendToWebhook: beacon err: ' + e); }
+            if(ok){ dbg('webhook sent via beacon'); const note=el('noteHosted'); if(note) note.textContent='Result posted to webhook (beacon).'; resolve(true); return; }
+          } catch(be){ dbg('beacon err: ' + be); }
         }
-      } catch(e){}
+      } catch(e){ dbg('beacon check err'); }
 
-      // 3) fetch POST with simple retry for CORS issues
-      let fetchOk = false;
+      // Try fetch POST to BOT_WEBHOOK (CORS mode)
       try {
         const resp = await fetch(BOT_WEBHOOK, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: body, keepalive:true, mode:'cors' });
-        if(resp && resp.ok){ dbg('sendToWebhook: posted via fetch (1)'); fetchOk = true; resolve(true); return; }
-        dbg('sendToWebhook: fetch(1) status ' + (resp && resp.status));
-      } catch(e){ dbg('sendToWebhook: fetch(1) err: ' + e); }
+        if(resp && (resp.status>=200 && resp.status<300)) {
+          dbg('webhook posted via fetch');
+          const note = el('noteHosted'); if(note) note.textContent = 'Result posted to webhook.';
+          resolve(true);
+          return;
+        } else {
+          dbg('webhook fetch responded: ' + (resp && resp.status));
+        }
+      } catch(e){ dbg('webhook fetch err: ' + e); }
 
-      // small delay then retry once (helps transient CORS/timeout)
-      if(!fetchOk){
-        try { await new Promise(r=>setTimeout(r, 350)); } catch(e){}
-        try {
-          const resp2 = await fetch(BOT_WEBHOOK, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: body, keepalive:true, mode:'cors' });
-          if(resp2 && resp2.ok){ dbg('sendToWebhook: posted via fetch (2)'); resolve(true); return; }
-          dbg('sendToWebhook: fetch(2) status ' + (resp2 && resp2.status));
-        } catch(e){ dbg('sendToWebhook: fetch(2) err: ' + e); }
-      }
-
-      // 4) if all above failed, try webhook candidate(s) from querystring (useful when WebApp.getUrl passed a webhook)
+      // 3) Try webhook candidates in querystring (if provided) - useful when WebApp.getUrl passed a webhook param
       try {
-        const qp = (function(){ const q = {}; (location.search.replace(/^\?/,'')||'').split('&').filter(Boolean).forEach(p=>{ const i=p.indexOf('='); if(i<0) q[decodeURIComponent(p)]=''; else q[decodeURIComponent(p.slice(0,i))]=decodeURIComponent(p.slice(i+1)); }); return q; })();
-        const cand = qp.webhook || qp.callback || qp.hook || qp.url;
-        if(cand){
+        const qp = (function(){
+          const q = {};
+          (location.search.replace(/^\?/,'') || '').split('&').filter(Boolean).forEach(p=>{ const i=p.indexOf('='); if(i<0) q[decodeURIComponent(p)]=''; else q[decodeURIComponent(p.slice(0,i))]=decodeURIComponent(p.slice(i+1)); });
+          return q;
+        })();
+        const candList = [];
+        if(qp.webhook) candList.push(qp.webhook);
+        if(qp.callback) candList.push(qp.callback);
+        if(qp.hook) candList.push(qp.hook);
+        if(qp.url) candList.push(qp.url);
+        for(const cand of Array.from(new Set(candList.filter(Boolean)))){
           try {
             const r = await fetch(cand, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: body, keepalive:true, mode:'cors' });
-            if(r && r.ok){ dbg('sendToWebhook: posted to candidate webhook'); const note = el('noteHosted'); if(note) note.textContent='Result posted to fallback webhook.'; resolve(true); return; }
-            dbg('sendToWebhook: candidate responded ' + (r && r.status));
-          } catch(e){ dbg('sendToWebhook: candidate webhook err: ' + e); }
+            if(r && r.ok) { dbg('webhook posted to candidate: ' + cand); const note = el('noteHosted'); if(note) note.textContent='Result posted to fallback webhook.'; resolve(true); return; }
+            dbg('candidate webhook responded: ' + (r && r.status));
+          } catch(e){ dbg('candidate webhook err: ' + e); }
         }
-      } catch(e){ dbg('sendToWebhook: candidate check err'); }
+      } catch(e){ dbg('candidate check err: ' + e); }
 
-      // 5) final fallback -> deeplink + clipboard
+      // 4) FALLBACK: deep link to bot start (base64) — will open Telegram and deliver payload to your bot via start param
       try {
         const b = btoa(body).replace(/=+$/,'');
-        // prefer BOT username from querystring or fallback
         const qp2 = (function(){ const s = location.search.replace(/^\?/,''); if(!s) return {}; return s.split('&').filter(Boolean).map(p=>{ const i=p.indexOf('='); if(i<0) return [decodeURIComponent(p),'']; return [decodeURIComponent(p.slice(0,i)), decodeURIComponent(p.slice(i+1))]; }).reduce((o,[k,v])=>{ o[k]=v; return o; }, {}); })();
         const botUser = qp2.bot_username || qp2.bot || FALLBACK_BOT_USERNAME;
-        const deeplink = "https://t.me/" + botUser + "?start=" + encodeURIComponent(b);
-        try { window.open(deeplink, "_blank"); } catch(e){}
+        const url = "https://t.me/" + botUser + "?start=" + encodeURIComponent(b);
+        try { window.open(url, "_blank"); } catch(e){}
+        const note = el('noteHosted'); if(note) note.textContent = 'Result copied to deeplink (open Telegram).';
         try { if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(body); } catch(e){}
-        const note = el('noteHosted'); if(note) note.textContent = 'Result copied to deeplink/clipboard (fallback).';
-        dbg('sendToWebhook: fallback deeplink used');
-        resolve(false); return;
-      } catch(e){ dbg('sendToWebhook: final fallback err: ' + e); }
+        resolve(false);
+        return;
+      } catch(e){ dbg('deeplink fallback err: ' + e); }
 
-      // nothing worked
+      // If we reach here, nothing worked
       const note = el('noteHosted'); if(note) note.textContent = 'Failed to post result to bot.';
       resolve(false);
     } catch(err) {
@@ -819,7 +843,6 @@ function sendToWebhook(data){
   });
 }
 
-/* 🛠️ [EDITED] requestCloseHost: keep as-is but ensure we give small delay for send attempts */
 function requestCloseHost(){
   try{
     try{ if(window.Telegram && Telegram.WebApp && typeof Telegram.WebApp.close === 'function'){ Telegram.WebApp.close(); return; } }catch(e){}
@@ -843,8 +866,8 @@ function finalizeAsSkippedIfActive(reason){
       try {
         const r = await sendToBotInternal('ad_skiped', result);
         dbg('skip sendToBotInternal result: ' + JSON.stringify(r));
-        // also post to BOT_WEBHOOK as a guaranteed store (best-effort)
-        try{ await sendToWebhook(result); }catch(e){}
+        // also post to BOT_WEBHOOK as a guaranteed store
+        try { await sendToWebhook(result); } catch(e){ dbg('skip sendToWebhook err: ' + e); }
       } catch(e){ dbg('finalizeAsSkippedIfActive send err: ' + e); }
     })();
     // also update public live feed
@@ -944,8 +967,8 @@ function startCountdownAndReport(authoritativePayload, source = 'deeplink'){
                 try {
                   const r = await sendToBotInternal('ads_validate', result);
                   dbg('auto-complete sendToBotInternal result: ' + JSON.stringify(r));
-                  // still post to BOT_WEBHOOK for audit / redundancy (best-effort)
-                  try{ await sendToWebhook(result); }catch(e){ dbg('auto sendToWebhook err'); }
+                  // still post to BOT_WEBHOOK for audit / redundancy
+                  try{ await sendToWebhook(result); }catch(e){ dbg('auto sendToWebhook err: ' + e); }
                 } catch(e){
                   dbg('auto-complete post failed: ' + e);
                 }
@@ -978,7 +1001,7 @@ function startCountdownAndReport(authoritativePayload, source = 'deeplink'){
                 const r = await sendToBotInternal('ads_validate', result);
                 dbg('claim sendToBotInternal resolved: ' + JSON.stringify(r));
                 // also post to BOT_WEBHOOK for redundancy
-                try{ await sendToWebhook(result); }catch(e){ dbg('claim sendToWebhook err'); }
+                try{ await sendToWebhook(result); }catch(e){ dbg('claim sendToWebhook err: ' + e); }
               } catch(e){
                 dbg('claim sendToBotInternal failed: ' + e);
               } finally {
