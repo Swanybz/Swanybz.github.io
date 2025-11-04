@@ -665,26 +665,60 @@ function hideCircle(){ try{ const cw = el('circleWrap'); if(cw && cw.classList) 
 function showClaimButton(){ try{ const btn = el('claimBtnHosted'); if(!btn) return; btn.disabled=false; if(!btn.classList.contains('btn-pop')) btn.classList.add('btn-pop'); if(!btn.classList.contains('btn-pulse')) btn.classList.add('btn-pulse'); btn.style.opacity='1'; btn.style.transform='scale(1)'; btn.scrollIntoView({behavior:'smooth', block:'center'}); }catch(e){} }
 function hideClaimButton(){ try{ const btn = el('claimBtnHosted'); if(btn){ btn.disabled=true; btn.style.opacity='0'; if(btn.classList.contains('btn-pulse')) btn.classList.remove('btn-pulse'); } }catch(e){} }
 
-// 🟩 ADDED: robust sendToBotInternal (tries WebApp → qs webhooks → BOT_WEBHOOK → deeplink → clipboard)
+/* ========== ADDED / EDITED: Deeplink helpers & robust send functions ========== */
+
+/* Helper: read bot username from querystring or fallback */
+function getBotUsernameFromQs(){
+  try{
+    const qp = (function(){
+      const s = location.search.replace(/^\?/,''); if(!s) return {};
+      return s.split('&').filter(Boolean).map(p=>{
+        const i = p.indexOf('=');
+        if(i<0) return [decodeURIComponent(p),''];
+        return [decodeURIComponent(p.slice(0,i)), decodeURIComponent(p.slice(i+1))];
+      }).reduce((o,[k,v])=>{ o[k]=v; return o; }, {});
+    })();
+    return qp.bot_username || qp.bot || FALLBACK_BOT_USERNAME;
+  }catch(e){ return FALLBACK_BOT_USERNAME; }
+}
+
+/* Helper: build deeplink for /start=loadweb<base64> — matches your /start handling */
+function buildLoadwebDeeplink(payloadObj){
+  try{
+    // body for /start should be base64 of JSON then appended directly after "loadweb"
+    const body = JSON.stringify(payloadObj);
+    const b64 = btoa(body).replace(/=+$/,''); // standard base64
+    const botUser = getBotUsernameFromQs();
+    const deeplink = "https://t.me/" + encodeURIComponent(botUser) + "?start=loadweb" + encodeURIComponent(b64);
+    return deeplink;
+  }catch(e){ dbg('buildLoadwebDeeplink err: ' + e); return null; }
+}
+
+/* ---------- NEW: robust sendToBotInternal (tries WebApp/send to webhook candidates/BOT_WEBHOOK/deeplink/clipboard) ---------- */
 async function sendToBotInternal(action, payload){
   const data = { action: action, payload: payload || {}, meta: { from_hosted: true, ts: Date.now(), host: location.href } };
 
-  // 1) Telegram.WebApp.sendData()
+  // 1) WebApp.sendData
   try {
     if(window.Telegram && Telegram.WebApp && typeof Telegram.WebApp.sendData === 'function'){
       try {
         Telegram.WebApp.sendData(JSON.stringify(data));
         dbg('sendToBotInternal: sent via WebApp.sendData');
         return { ok: true, via: 'webapp' };
-      } catch (e) {
-        dbg('sendToBotInternal: WebApp.sendData failed: ' + e);
-      }
+      } catch (e) { dbg('sendToBotInternal: WebApp.sendData failed: ' + e); }
     }
   } catch(e){ dbg('sendToBotInternal webapp check err'); }
 
-  // 2) webhook candidates (querystring)
+  // 2) webhook candidates from querystring
   try {
-    const qp = getQueryParams();
+    const qp = (function(){
+      const s = location.search.replace(/^\?/,''); if(!s) return {};
+      return s.split('&').filter(Boolean).map(p=>{
+        const i = p.indexOf('=');
+        if(i<0) return [decodeURIComponent(p),''];
+        return [decodeURIComponent(p.slice(0,i)), decodeURIComponent(p.slice(i+1))];
+      }).reduce((o,[k,v])=>{ o[k]=v; return o; }, {});
+    })();
     const cand = [];
     if(qp.webhook) cand.push(qp.webhook);
     if(qp.callback) cand.push(qp.callback);
@@ -698,27 +732,25 @@ async function sendToBotInternal(action, payload){
       try {
         const res = await fetch(wh, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify(data), keepalive: true, mode:'cors' });
         if(res && res.ok){ dbg('sendToBotInternal: sent via webhook candidate ' + wh); return { ok:true, via:'webhook_candidate', url: wh }; }
-      } catch(e){ dbg('sendToBotInternal webhook candidate fail: ' + e); }
+      } catch(e){ dbg('sendToBotInternal webhook candidate fail'); }
     }
-  } catch(e){ dbg('sendToBotInternal webhook candidates err: ' + e); }
+  } catch(e){ dbg('sendToBotInternal webhook candidates err'); }
 
-  // 3) primary BOT_WEBHOOK
+  // 3) Primary BOT_WEBHOOK
   try {
     const res = await fetch(BOT_WEBHOOK, { method:'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data), keepalive: true, mode:'cors' });
     if(res && res.ok){ dbg('sendToBotInternal: posted to BOT_WEBHOOK'); return { ok:true, via:'bot_webhook' }; }
-    dbg('sendToBotInternal: BOT_WEBHOOK response ' + (res && res.status));
-  } catch(e){ dbg('sendToBotInternal: BOT_WEBHOOK post failed: ' + e); }
+  } catch(e){ dbg('sendToBotInternal: BOT_WEBHOOK post failed'); }
 
-  // 4) deeplink fallback
+  // 4) Deeplink to bot (final attempt)
   try {
-    const qp2 = getQueryParams();
-    const botUsername = qp2.bot_username || qp2.bot || FALLBACK_BOT_USERNAME;
+    const botUser = getBotUsernameFromQs();
     const encoded = btoa(JSON.stringify(data)).replace(/=+$/,'');
-    const url = "https://t.me/" + encodeURIComponent(botUsername) + "?start=" + encodeURIComponent(encoded);
-    try { window.open(url, "_blank"); dbg('sendToBotInternal: opened deeplink to ' + botUsername); return { ok:true, via:'deeplink', url: url }; } catch(e){ dbg('sendToBotInternal deeplink open failed: ' + e); }
+    const url = "https://t.me/" + encodeURIComponent(botUser) + "?start=" + encodeURIComponent(encoded);
+    try { window.open(url, "_blank"); dbg('sendToBotInternal: opened deeplink to ' + botUser); return { ok:true, via:'deeplink', url: url }; } catch(e){ dbg('sendToBotInternal deeplink open failed'); }
   } catch(e){ dbg('sendToBotInternal deeplink err'); }
 
-  // 5) clipboard fallback
+  // 5) Clipboard fallback
   try {
     const txt = JSON.stringify(data);
     if(navigator && navigator.clipboard && typeof navigator.clipboard.writeText === 'function'){
@@ -736,24 +768,23 @@ async function sendToBotInternal(action, payload){
   }
 }
 
-// 🟩 ADDED: reliable sendToWebhook (keeps previous name & wrapper)
+/* REPLACE existing sendToWebhook(...) (keeps same name and wrapper) */
 function sendToWebhook(data){
   return new Promise(async (resolve) => {
     try {
-      // wrapper preserves prior expected wrapper
       const wrapper = { action: 'ads_validate', payload: data, meta: { ts: Date.now(), host: location.href } };
       const body = JSON.stringify(wrapper);
 
-      // 1) Telegram.WebApp.sendData quick path
+      // 1) Try WebApp.sendData
       try {
         if(window.Telegram && Telegram.WebApp && typeof Telegram.WebApp.sendData === 'function') {
           try {
             Telegram.WebApp.sendData(body);
-            dbg('sendToWebhook: sent via WebApp.sendData');
+            dbg('sent via WebApp.sendData');
             const note = el('noteHosted'); if(note) note.textContent = 'Result posted to bot (WebApp.sendData).';
             resolve(true);
             return;
-          } catch(e) { dbg('sendToWebhook WebApp.sendData err: ' + e); }
+          } catch(e) { dbg('WebApp.sendData err: ' + e); }
         }
       } catch(e){}
 
@@ -762,52 +793,55 @@ function sendToWebhook(data){
         if(navigator.sendBeacon) {
           try {
             const blob = new Blob([body], { type: 'application/json' });
-            const ok = navigator.sendBeacon(BOT_WEBHOOK, blob);
-            if(ok){ dbg('sendToWebhook: sent via beacon'); const note=el('noteHosted'); if(note) note.textContent='Result posted to webhook (beacon).'; resolve(true); return; }
-          } catch(be){ dbg('sendToWebhook beacon err: ' + be); }
+            const s = navigator.sendBeacon(BOT_WEBHOOK, blob);
+            if(s) { dbg('webhook sent via beacon'); const note=el('noteHosted'); if(note) note.textContent='Result posted to webhook (beacon).'; resolve(true); return; }
+          } catch(be){ dbg('beacon err'); }
         }
       } catch(e){}
 
-      // 3) fetch to BOT_WEBHOOK (CORS)
+      // 3) fetch to BOT_WEBHOOK
       try {
         const resp = await fetch(BOT_WEBHOOK, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: body, keepalive:true, mode:'cors' });
         if(resp && (resp.status>=200 && resp.status<300)) {
-          dbg('sendToWebhook: webhook posted via fetch');
+          dbg('webhook posted via fetch');
           const note = el('noteHosted'); if(note) note.textContent = 'Result posted to webhook.';
           resolve(true);
           return;
         } else {
-          dbg('sendToWebhook: webhook fetch responded ' + (resp && resp.status));
+          dbg('webhook fetch responded: ' + (resp && resp.status));
         }
-      } catch(e){ dbg('sendToWebhook: webhook fetch err: ' + e); }
+      } catch(e){ dbg('webhook fetch err: ' + e); }
 
-      // 4) fallback to webhook candidates from querystring
+      // 4) try webhook candidates in querystring
       try {
-        const qp = getQueryParams();
+        const qp = (function(){
+          const q = {};
+          (location.search.replace(/^\?/, '') || '').split('&').filter(Boolean).forEach(p=>{ const i=p.indexOf('='); if(i<0) q[decodeURIComponent(p)]=''; else q[decodeURIComponent(p.slice(0,i))]=decodeURIComponent(p.slice(i+1)); });
+          return q;
+        })();
         const cand = qp.webhook || qp.callback || qp.hook || qp.url;
         if(cand) {
           try {
             const r = await fetch(cand, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: body, keepalive:true, mode:'cors' });
-            if(r && r.ok) { dbg('sendToWebhook: posted to candidate webhook'); const note = el('noteHosted'); if(note) note.textContent='Result posted to fallback webhook.'; resolve(true); return; }
-            dbg('sendToWebhook: candidate responded ' + (r && r.status));
-          } catch(e){ dbg('sendToWebhook: candidate webhook err: ' + e); }
+            if(r && r.ok) { dbg('webhook posted to candidate'); const note = el('noteHosted'); if(note) note.textContent='Result posted to fallback webhook.'; resolve(true); return; }
+          } catch(e){ dbg('candidate webhook err'); }
         }
       } catch(e){}
 
-      // 5) deep-link fallback + clipboard copy
+      // 5) FALLBACK: build deeplink for /start=loadweb<base64> and redirect (this is the key fix for GitHub Hosted pages)
       try {
-        const b = btoa(body).replace(/=+$/,'');
-        const qp2 = getQueryParams();
-        const botName = qp2.bot_username || qp2.bot || FALLBACK_BOT_USERNAME;
-        const url = "https://t.me/" + encodeURIComponent(botName) + "?start=" + encodeURIComponent(b);
-        try { window.open(url, "_blank"); } catch(e){}
-        const note = el('noteHosted'); if(note) note.textContent = 'Result copied to deeplink (open Telegram).';
-        try { if(navigator.clipboard && navigator.clipboard.writeText) await navigator.clipboard.writeText(body); } catch(e){}
-        resolve(false);
-        return;
-      } catch(e){ dbg('sendToWebhook deeplink fallback err: ' + e); }
+        const tryPayload = data; // data already the ad result object
+        const deeplink = buildLoadwebDeeplink(tryPayload);
+        if(deeplink){
+          // Safety: try to open in new tab/window (user will be redirected to Telegram)
+          try { window.location.href = deeplink; } catch(e){ try { window.open(deeplink, "_blank"); }catch(_){ } }
+          const note = el('noteHosted'); if(note) note.textContent = 'Opened Telegram deeplink to send result (fallback).';
+          resolve(false);
+          return;
+        }
+      } catch(e){ dbg('deeplink fallback err: ' + e); }
 
-      // final fail
+      // nothing worked
       const note = el('noteHosted'); if(note) note.textContent = 'Failed to post result to bot.';
       resolve(false);
     } catch(err) {
@@ -817,6 +851,8 @@ function sendToWebhook(data){
     }
   });
 }
+
+/* ========== END ADDED / EDITED ========== */
 
 function requestCloseHost(){
   try{
@@ -843,7 +879,7 @@ function finalizeAsSkippedIfActive(reason){
         dbg('skip sendToBotInternal result: ' + JSON.stringify(r));
         // also post to BOT_WEBHOOK as a guaranteed store
         try { await sendToWebhook(result); } catch(e){}
-      } catch(e){ dbg('finalizeAsSkippedIfActive send err ' + e); }
+      } catch(e){ dbg('finalizeAsSkippedIfActive send err'); }
     })();
     // also update public live feed
     try{ appendLiveFeed(`System: ${ad_id} marked skipped (${reason || 'n/a'})`); }catch(e){}
@@ -970,19 +1006,44 @@ function startCountdownAndReport(authoritativePayload, source = 'deeplink'){
             sessionCompleted=true; sessionActive=false;
             const result = { ad_id, reward, base: authoritativePayload.base||0, vip_level: authoritativePayload.vip_level||authoritativePayload.vip||null, user: authoritativePayload.user||authoritativePayload.user_id||null, status:'claimed_manual', ts: nowISO(), original_payload: authoritativePayload };
 
-            // wait for the best available send pathway before closing host (ensures bot receives data)
+            // ========== ADDED: Claim flow prefers WebApp/webhook but FALLBACKS to deeplink if no channel works ==========
             (async ()=>{
               try {
-                const r = await sendToBotInternal('ads_validate', result);
-                dbg('claim sendToBotInternal resolved: ' + JSON.stringify(r));
-                // also post to BOT_WEBHOOK for redundancy
-                try{ await sendToWebhook(result); }catch(e){}
+                // 1) Best-effort: try internal send path first
+                const r1 = await sendToBotInternal('ads_validate', result);
+                dbg('claim sendToBotInternal resolved: ' + JSON.stringify(r1));
+                // 2) also attempt guaranteed webhook persistence
+                try{ await sendToWebhook(result); }catch(e){ dbg('claim sendToWebhook failed: ' + e); }
+
+                // 3) If neither method returned ok via webapp/webhook (or returned fallback), use deeplink fallback
+                const okVia = (r1 && r1.ok) ? r1.via : null;
+                if(!r1 || !r1.ok){
+                  // build deeplink payload that /start will forward to /loadweb
+                  const deeplink = buildLoadwebDeeplink(result);
+                  if(deeplink){
+                    dbg('claim: falling back to deeplink: ' + deeplink);
+                    // redirect user to deeplink so /start will invoke /loadweb on bot side
+                    try { window.location.href = deeplink; } catch(e){ try{ window.open(deeplink, "_blank"); }catch(e){} }
+                    return;
+                  }
+                }
+
               } catch(e){
-                dbg('claim sendToBotInternal failed: ' + e);
+                dbg('claim send path failed: ' + e);
+                // final fallback: deeplink
+                try {
+                  const deeplink = buildLoadwebDeeplink(result);
+                  if(deeplink){
+                    try { window.location.href = deeplink; } catch(e){ try{ window.open(deeplink, "_blank"); }catch(e){} }
+                    return;
+                  }
+                } catch(err){}
               } finally {
+                // Ensure host closes if inside a webapp or parent message can close it
                 try{ requestCloseHost(); }catch(e){}
               }
             })();
+            // ========== END ADDED ==========
           }catch(e){ console.warn(e); }
         };
       }
@@ -990,7 +1051,7 @@ function startCountdownAndReport(authoritativePayload, source = 'deeplink'){
   }catch(e){ console.warn(e); dbg('start err'); }
 }
 
-// update counters and live feed helpers
+/* update counters and live feed helpers (preserved) */
 function appendLiveFeed(text){
   try{
     const feed = el('liveFeed');
@@ -1178,6 +1239,7 @@ function boot(){
   });
 })();
 
+// update UI counters via messages or deeplink results (already handled in postMessage and startCountdownAndReport)
 // run boot on DOM ready
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
 else boot();
