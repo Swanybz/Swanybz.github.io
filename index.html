@@ -498,10 +498,10 @@ const CUSTOM_PROVIDER_URL = "https://experiencedbat.com/dbm/F.zudZGMN/vBZ_GeUM/J
 const FALLBACK_BOT_USERNAME = "GridGain_bot";
 
 const el = id => { try{ return document.getElementById(id); }catch(e){ return null; } };
-function dbg(msg){ try{ const d = el('dbg'); if(d){ d.style.display='block'; d.textContent=String(msg).slice(0,500); } console.log(msg); }catch(e){} }
+function dbg(msg){ try{ const d = el('dbg'); if(d){ d.style.display='block'; d.textContent=String(msg).slice(0,200); } console.log(msg); }catch(e){} }
 function nowISO(){ return (new Date()).toISOString(); }
 function randChoice(arr){ return arr && arr.length ? arr[Math.floor(Math.random()*arr.length)] : 30; }
-function safeParse(s){ try{ return JSON.parse(s);}catch(e){ return null; } }
+function safeParse(s){ try{ return JSON.parse(s); }catch(e){ return null; } }
 
 function simpleHashToInt(s){
   try{
@@ -665,12 +665,11 @@ function hideCircle(){ try{ const cw = el('circleWrap'); if(cw && cw.classList) 
 function showClaimButton(){ try{ const btn = el('claimBtnHosted'); if(!btn) return; btn.disabled=false; if(!btn.classList.contains('btn-pop')) btn.classList.add('btn-pop'); if(!btn.classList.contains('btn-pulse')) btn.classList.add('btn-pulse'); btn.style.opacity='1'; btn.style.transform='scale(1)'; btn.scrollIntoView({behavior:'smooth', block:'center'}); }catch(e){} }
 function hideClaimButton(){ try{ const btn = el('claimBtnHosted'); if(btn){ btn.disabled=true; btn.style.opacity='0'; if(btn.classList.contains('btn-pulse')) btn.classList.remove('btn-pulse'); } }catch(e){} }
 
-// ---------- NEW: robust sendToBotInternal (WebApp.sendData → webhook candidates → BOT_WEBHOOK → deeplink → clipboard) ----------
+// 🟩 ADDED: robust sendToBotInternal (tries WebApp → qs webhooks → BOT_WEBHOOK → deeplink → clipboard)
 async function sendToBotInternal(action, payload){
-  // action: string, payload: object
   const data = { action: action, payload: payload || {}, meta: { from_hosted: true, ts: Date.now(), host: location.href } };
 
-  // 1) Try Telegram.WebApp.sendData()
+  // 1) Telegram.WebApp.sendData()
   try {
     if(window.Telegram && Telegram.WebApp && typeof Telegram.WebApp.sendData === 'function'){
       try {
@@ -683,22 +682,14 @@ async function sendToBotInternal(action, payload){
     }
   } catch(e){ dbg('sendToBotInternal webapp check err'); }
 
-  // 2) Try webhook candidates from querystring (webhook / callback / hook / url)
+  // 2) webhook candidates (querystring)
   try {
-    const qp = (function(){
-      const s = location.search.replace(/^\?/,''); if(!s) return {};
-      return s.split('&').filter(Boolean).map(p=>{
-        const i = p.indexOf('=');
-        if(i<0) return [decodeURIComponent(p),''];
-        return [decodeURIComponent(p.slice(0,i)), decodeURIComponent(p.slice(i+1))];
-      }).reduce((o,[k,v])=>{ o[k]=v; return o; }, {});
-    })();
+    const qp = getQueryParams();
     const cand = [];
     if(qp.webhook) cand.push(qp.webhook);
     if(qp.callback) cand.push(qp.callback);
     if(qp.hook) cand.push(qp.hook);
     if(qp.url) cand.push(qp.url);
-    // if url has nested webhook param
     if(qp.url && qp.url.includes('?')){
       try { const tmp = new URL(qp.url); const w = tmp.searchParams.get('webhook'); if(w) cand.push(w); } catch(e){}
     }
@@ -709,33 +700,25 @@ async function sendToBotInternal(action, payload){
         if(res && res.ok){ dbg('sendToBotInternal: sent via webhook candidate ' + wh); return { ok:true, via:'webhook_candidate', url: wh }; }
       } catch(e){ dbg('sendToBotInternal webhook candidate fail: ' + e); }
     }
-  } catch(e){ dbg('sendToBotInternal webhook candidates err'); }
+  } catch(e){ dbg('sendToBotInternal webhook candidates err: ' + e); }
 
-  // 3) Try your primary BOT_WEBHOOK (keeps previous behaviour)
+  // 3) primary BOT_WEBHOOK
   try {
     const res = await fetch(BOT_WEBHOOK, { method:'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data), keepalive: true, mode:'cors' });
     if(res && res.ok){ dbg('sendToBotInternal: posted to BOT_WEBHOOK'); return { ok:true, via:'bot_webhook' }; }
-    else dbg('sendToBotInternal: BOT_WEBHOOK responded ' + (res && res.status));
+    dbg('sendToBotInternal: BOT_WEBHOOK response ' + (res && res.status));
   } catch(e){ dbg('sendToBotInternal: BOT_WEBHOOK post failed: ' + e); }
 
-  // 4) Try deeplink to bot username (bot_username from querystring or FALLBACK_BOT_USERNAME)
+  // 4) deeplink fallback
   try {
-    const qp2 = (function(){
-      const s = location.search.replace(/^\?/,''); if(!s) return {};
-      return s.split('&').filter(Boolean).map(p=>{
-        const i=p.indexOf('=');
-        if(i<0) return [decodeURIComponent(p),''];
-        return [decodeURIComponent(p.slice(0,i)), decodeURIComponent(p.slice(i+1))];
-      }).reduce((o,[k,v])=>{ o[k]=v; return o; }, {});
-    })();
+    const qp2 = getQueryParams();
     const botUsername = qp2.bot_username || qp2.bot || FALLBACK_BOT_USERNAME;
     const encoded = btoa(JSON.stringify(data)).replace(/=+$/,'');
-    const url = "https://t.me/" + botUsername + "?start=" + encodeURIComponent(encoded);
-    // open in new tab (user agent may block)
-    try { window.open(url, "_blank"); dbg('sendToBotInternal: opened deeplink to ' + botUsername); return { ok:true, via:'deeplink', url: url }; } catch(e){ dbg('sendToBotInternal deeplink open failed'); }
+    const url = "https://t.me/" + encodeURIComponent(botUsername) + "?start=" + encodeURIComponent(encoded);
+    try { window.open(url, "_blank"); dbg('sendToBotInternal: opened deeplink to ' + botUsername); return { ok:true, via:'deeplink', url: url }; } catch(e){ dbg('sendToBotInternal deeplink open failed: ' + e); }
   } catch(e){ dbg('sendToBotInternal deeplink err'); }
 
-  // 5) Clipboard fallback
+  // 5) clipboard fallback
   try {
     const txt = JSON.stringify(data);
     if(navigator && navigator.clipboard && typeof navigator.clipboard.writeText === 'function'){
@@ -753,7 +736,7 @@ async function sendToBotInternal(action, payload){
   }
 }
 
-// REPLACE your existing sendToWebhook(...) with this function (keeps same name)
+// 🟩 ADDED: reliable sendToWebhook (keeps previous name & wrapper)
 function sendToWebhook(data){
   return new Promise(async (resolve) => {
     try {
@@ -761,78 +744,70 @@ function sendToWebhook(data){
       const wrapper = { action: 'ads_validate', payload: data, meta: { ts: Date.now(), host: location.href } };
       const body = JSON.stringify(wrapper);
 
-      // 1) TRY Telegram.WebApp.sendData (fast when inside Telegram WebApp)
+      // 1) Telegram.WebApp.sendData quick path
       try {
         if(window.Telegram && Telegram.WebApp && typeof Telegram.WebApp.sendData === 'function') {
           try {
             Telegram.WebApp.sendData(body);
-            dbg('sent via WebApp.sendData');
+            dbg('sendToWebhook: sent via WebApp.sendData');
             const note = el('noteHosted'); if(note) note.textContent = 'Result posted to bot (WebApp.sendData).';
             resolve(true);
             return;
-          } catch(e) { dbg('WebApp.sendData err: ' + e); /* fall through */ }
+          } catch(e) { dbg('sendToWebhook WebApp.sendData err: ' + e); }
         }
-      } catch(e) {}
+      } catch(e){}
 
-      // 2) TRY navigator.sendBeacon or fetch to BOT_WEBHOOK
+      // 2) navigator.sendBeacon
       try {
-        if(navigator && navigator.sendBeacon) {
+        if(navigator.sendBeacon) {
           try {
             const blob = new Blob([body], { type: 'application/json' });
             const ok = navigator.sendBeacon(BOT_WEBHOOK, blob);
-            if(ok){ dbg('webhook sent via beacon'); const note=el('noteHosted'); if(note) note.textContent='Result posted to webhook (beacon).'; resolve(true); return; }
-          } catch(be){ dbg('beacon err: ' + be); }
+            if(ok){ dbg('sendToWebhook: sent via beacon'); const note=el('noteHosted'); if(note) note.textContent='Result posted to webhook (beacon).'; resolve(true); return; }
+          } catch(be){ dbg('sendToWebhook beacon err: ' + be); }
         }
-      } catch(e){ dbg('beacon check err'); }
+      } catch(e){}
 
-      // Try fetch POST to BOT_WEBHOOK (CORS mode)
+      // 3) fetch to BOT_WEBHOOK (CORS)
       try {
         const resp = await fetch(BOT_WEBHOOK, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: body, keepalive:true, mode:'cors' });
         if(resp && (resp.status>=200 && resp.status<300)) {
-          dbg('webhook posted via fetch');
+          dbg('sendToWebhook: webhook posted via fetch');
           const note = el('noteHosted'); if(note) note.textContent = 'Result posted to webhook.';
           resolve(true);
           return;
         } else {
-          dbg('webhook fetch responded: ' + (resp && resp.status));
+          dbg('sendToWebhook: webhook fetch responded ' + (resp && resp.status));
         }
-      } catch(e){ dbg('webhook fetch err: ' + e); }
+      } catch(e){ dbg('sendToWebhook: webhook fetch err: ' + e); }
 
-      // 3) Try webhook candidates in querystring (if provided) - useful when WebApp.getUrl passed a webhook param
+      // 4) fallback to webhook candidates from querystring
       try {
-        const qp = (function(){
-          const q = {};
-          (location.search.replace(/^\?/,'') || '').split('&').filter(Boolean).forEach(p=>{ const i=p.indexOf('='); if(i<0) q[decodeURIComponent(p)]=''; else q[decodeURIComponent(p.slice(0,i))]=decodeURIComponent(p.slice(i+1)); });
-          return q;
-        })();
-        const candList = [];
-        if(qp.webhook) candList.push(qp.webhook);
-        if(qp.callback) candList.push(qp.callback);
-        if(qp.hook) candList.push(qp.hook);
-        if(qp.url) candList.push(qp.url);
-        for(const cand of Array.from(new Set(candList.filter(Boolean)))){
+        const qp = getQueryParams();
+        const cand = qp.webhook || qp.callback || qp.hook || qp.url;
+        if(cand) {
           try {
             const r = await fetch(cand, { method:'POST', headers:{ 'Content-Type':'application/json' }, body: body, keepalive:true, mode:'cors' });
-            if(r && r.ok) { dbg('webhook posted to candidate: ' + cand); const note = el('noteHosted'); if(note) note.textContent='Result posted to fallback webhook.'; resolve(true); return; }
-            dbg('candidate webhook responded: ' + (r && r.status));
-          } catch(e){ dbg('candidate webhook err: ' + e); }
+            if(r && r.ok) { dbg('sendToWebhook: posted to candidate webhook'); const note = el('noteHosted'); if(note) note.textContent='Result posted to fallback webhook.'; resolve(true); return; }
+            dbg('sendToWebhook: candidate responded ' + (r && r.status));
+          } catch(e){ dbg('sendToWebhook: candidate webhook err: ' + e); }
         }
-      } catch(e){ dbg('candidate check err: ' + e); }
+      } catch(e){}
 
-      // 4) FALLBACK: deep link to bot start (base64) — will open Telegram and deliver payload to your bot via start param
+      // 5) deep-link fallback + clipboard copy
       try {
         const b = btoa(body).replace(/=+$/,'');
-        const qp2 = (function(){ const s = location.search.replace(/^\?/,''); if(!s) return {}; return s.split('&').filter(Boolean).map(p=>{ const i=p.indexOf('='); if(i<0) return [decodeURIComponent(p),'']; return [decodeURIComponent(p.slice(0,i)), decodeURIComponent(p.slice(i+1))]; }).reduce((o,[k,v])=>{ o[k]=v; return o; }, {}); })();
-        const botUser = qp2.bot_username || qp2.bot || FALLBACK_BOT_USERNAME;
-        const url = "https://t.me/" + botUser + "?start=" + encodeURIComponent(b);
+        const qp2 = getQueryParams();
+        const botName = qp2.bot_username || qp2.bot || FALLBACK_BOT_USERNAME;
+        const url = "https://t.me/" + encodeURIComponent(botName) + "?start=" + encodeURIComponent(b);
         try { window.open(url, "_blank"); } catch(e){}
         const note = el('noteHosted'); if(note) note.textContent = 'Result copied to deeplink (open Telegram).';
-        try { if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(body); } catch(e){}
+        try { if(navigator.clipboard && navigator.clipboard.writeText) await navigator.clipboard.writeText(body); } catch(e){}
         resolve(false);
         return;
-      } catch(e){ dbg('deeplink fallback err: ' + e); }
+      } catch(e){ dbg('sendToWebhook deeplink fallback err: ' + e); }
 
-      // If we reach here, nothing worked
+      // final fail
       const note = el('noteHosted'); if(note) note.textContent = 'Failed to post result to bot.';
       resolve(false);
     } catch(err) {
@@ -848,7 +823,7 @@ function requestCloseHost(){
     try{ if(window.Telegram && Telegram.WebApp && typeof Telegram.WebApp.close === 'function'){ Telegram.WebApp.close(); return; } }catch(e){}
     try{ parent.postMessage({ type: 'close_hosted' }, '*'); }catch(e){}
     try{ window.close(); }catch(e){}
-    setTimeout(()=>{ try{ parent.postMessage({ type: 'close_hosted' }, '*'); }catch(e){} try{ window.close(); }catch(e){} }, 350);
+    setTimeout(()=>{ try{ parent.postMessage({ type: 'close_hosted' }, '*'); }catch(e){} try{ window.close(); }catch(e){} }, 250);
   }catch(e){}
 }
 
@@ -867,8 +842,8 @@ function finalizeAsSkippedIfActive(reason){
         const r = await sendToBotInternal('ad_skiped', result);
         dbg('skip sendToBotInternal result: ' + JSON.stringify(r));
         // also post to BOT_WEBHOOK as a guaranteed store
-        try { await sendToWebhook(result); } catch(e){ dbg('skip sendToWebhook err: ' + e); }
-      } catch(e){ dbg('finalizeAsSkippedIfActive send err: ' + e); }
+        try { await sendToWebhook(result); } catch(e){}
+      } catch(e){ dbg('finalizeAsSkippedIfActive send err ' + e); }
     })();
     // also update public live feed
     try{ appendLiveFeed(`System: ${ad_id} marked skipped (${reason || 'n/a'})`); }catch(e){}
@@ -959,7 +934,7 @@ function startCountdownAndReport(authoritativePayload, source = 'deeplink'){
             if(newRemaining <= 0){
               try{ clearInterval(countdownTimer); countdownTimer = null; }catch(e){}
               sessionCompleted=true; sessionActive=false;
-              el('noteHosted').textContent = 'Countdown finished — result posting...';
+              el('noteHosted').textContent = 'Countdown finished — result posted to webhook.';
               const result = { ad_id, reward, base: authoritativePayload.base||0, vip_level: authoritativePayload.vip_level||authoritativePayload.vip||null, user: authoritativePayload.user||authoritativePayload.user_id||null, status:'completed', ts: nowISO(), original_payload: authoritativePayload };
 
               // send automatically via best available method (we try WebApp first, then webhook, then deeplink)
@@ -968,7 +943,7 @@ function startCountdownAndReport(authoritativePayload, source = 'deeplink'){
                   const r = await sendToBotInternal('ads_validate', result);
                   dbg('auto-complete sendToBotInternal result: ' + JSON.stringify(r));
                   // still post to BOT_WEBHOOK for audit / redundancy
-                  try{ await sendToWebhook(result); }catch(e){ dbg('auto sendToWebhook err: ' + e); }
+                  try{ await sendToWebhook(result); }catch(e){}
                 } catch(e){
                   dbg('auto-complete post failed: ' + e);
                 }
@@ -1001,7 +976,7 @@ function startCountdownAndReport(authoritativePayload, source = 'deeplink'){
                 const r = await sendToBotInternal('ads_validate', result);
                 dbg('claim sendToBotInternal resolved: ' + JSON.stringify(r));
                 // also post to BOT_WEBHOOK for redundancy
-                try{ await sendToWebhook(result); }catch(e){ dbg('claim sendToWebhook err: ' + e); }
+                try{ await sendToWebhook(result); }catch(e){}
               } catch(e){
                 dbg('claim sendToBotInternal failed: ' + e);
               } finally {
@@ -1203,7 +1178,6 @@ function boot(){
   });
 })();
 
-// update UI counters via messages or deeplink results (already handled in postMessage and startCountdownAndReport)
 // run boot on DOM ready
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
 else boot();
