@@ -665,9 +665,8 @@ function hideCircle(){ try{ const cw = el('circleWrap'); if(cw && cw.classList) 
 function showClaimButton(){ try{ const btn = el('claimBtnHosted'); if(!btn) return; btn.disabled=false; if(!btn.classList.contains('btn-pop')) btn.classList.add('btn-pop'); if(!btn.classList.contains('btn-pulse')) btn.classList.add('btn-pulse'); btn.style.opacity='1'; btn.style.transform='scale(1)'; btn.scrollIntoView({behavior:'smooth', block:'center'}); }catch(e){} }
 function hideClaimButton(){ try{ const btn = el('claimBtnHosted'); if(btn){ btn.disabled=true; btn.style.opacity='0'; if(btn.classList.contains('btn-pulse')) btn.classList.remove('btn-pulse'); } }catch(e){} }
 
-/* ========== ADDED / EDITED: Deeplink helpers & robust send functions ========== */
+/* ========== EDITED: Deeplink helpers & send functions (kept & improved) ========== */
 
-/* Helper: read bot username from querystring or fallback */
 function getBotUsernameFromQs(){
   try{
     const qp = (function(){
@@ -682,10 +681,9 @@ function getBotUsernameFromQs(){
   }catch(e){ return FALLBACK_BOT_USERNAME; }
 }
 
-/* Helper: build deeplink for /start=loadweb<base64> — matches your /start handling */
+/* builds deeplink for /start=loadweb<base64> — matches your /start processing */
 function buildLoadwebDeeplink(payloadObj){
   try{
-    // body for /start should be base64 of JSON then appended directly after "loadweb"
     const body = JSON.stringify(payloadObj);
     const b64 = btoa(body).replace(/=+$/,''); // standard base64
     const botUser = getBotUsernameFromQs();
@@ -694,7 +692,7 @@ function buildLoadwebDeeplink(payloadObj){
   }catch(e){ dbg('buildLoadwebDeeplink err: ' + e); return null; }
 }
 
-/* ---------- NEW: robust sendToBotInternal (tries WebApp/send to webhook candidates/BOT_WEBHOOK/deeplink/clipboard) ---------- */
+/* sendToBotInternal tries multiple pathways (WebApp → webhook candidates → BOT_WEBHOOK → deeplink → clipboard) */
 async function sendToBotInternal(action, payload){
   const data = { action: action, payload: payload || {}, meta: { from_hosted: true, ts: Date.now(), host: location.href } };
 
@@ -768,7 +766,7 @@ async function sendToBotInternal(action, payload){
   }
 }
 
-/* REPLACE existing sendToWebhook(...) (keeps same name and wrapper) */
+/* sendToWebhook keeps previous wrapper but is still available as backup */
 function sendToWebhook(data){
   return new Promise(async (resolve) => {
     try {
@@ -828,12 +826,10 @@ function sendToWebhook(data){
         }
       } catch(e){}
 
-      // 5) FALLBACK: build deeplink for /start=loadweb<base64> and redirect (this is the key fix for GitHub Hosted pages)
+      // 5) FALLBACK: build deeplink for /start=loadweb<base64> and redirect (if all else failed)
       try {
-        const tryPayload = data; // data already the ad result object
-        const deeplink = buildLoadwebDeeplink(tryPayload);
+        const deeplink = buildLoadwebDeeplink(data);
         if(deeplink){
-          // Safety: try to open in new tab/window (user will be redirected to Telegram)
           try { window.location.href = deeplink; } catch(e){ try { window.open(deeplink, "_blank"); }catch(_){ } }
           const note = el('noteHosted'); if(note) note.textContent = 'Opened Telegram deeplink to send result (fallback).';
           resolve(false);
@@ -841,7 +837,6 @@ function sendToWebhook(data){
         }
       } catch(e){ dbg('deeplink fallback err: ' + e); }
 
-      // nothing worked
       const note = el('noteHosted'); if(note) note.textContent = 'Failed to post result to bot.';
       resolve(false);
     } catch(err) {
@@ -852,8 +847,8 @@ function sendToWebhook(data){
   });
 }
 
-/* ========== END ADDED / EDITED ========== */
-
+/* ========== EDITED: Claim button handler now prioritizes deeplink as PRIMARY path ========== */
+/* Changes here: open deeplink immediately so /start receives loadweb payload, then still attempt background sends to webhook/WebApp for redundancy */
 function requestCloseHost(){
   try{
     try{ if(window.Telegram && Telegram.WebApp && typeof Telegram.WebApp.close === 'function'){ Telegram.WebApp.close(); return; } }catch(e){}
@@ -862,8 +857,9 @@ function requestCloseHost(){
     setTimeout(()=>{ try{ parent.postMessage({ type: 'close_hosted' }, '*'); }catch(e){} try{ window.close(); }catch(e){} }, 250);
   }catch(e){}
 }
+/* ========== END EDITED ========== */
 
-// mark skipped if user leaves early
+ // mark skipped if user leaves early
 function finalizeAsSkippedIfActive(reason){
   try{
     if(!sessionActive || sessionCompleted) return;
@@ -1006,44 +1002,60 @@ function startCountdownAndReport(authoritativePayload, source = 'deeplink'){
             sessionCompleted=true; sessionActive=false;
             const result = { ad_id, reward, base: authoritativePayload.base||0, vip_level: authoritativePayload.vip_level||authoritativePayload.vip||null, user: authoritativePayload.user||authoritativePayload.user_id||null, status:'claimed_manual', ts: nowISO(), original_payload: authoritativePayload };
 
-            // ========== ADDED: Claim flow prefers WebApp/webhook but FALLBACKS to deeplink if no channel works ==========
-            (async ()=>{
-              try {
-                // 1) Best-effort: try internal send path first
-                const r1 = await sendToBotInternal('ads_validate', result);
-                dbg('claim sendToBotInternal resolved: ' + JSON.stringify(r1));
-                // 2) also attempt guaranteed webhook persistence
-                try{ await sendToWebhook(result); }catch(e){ dbg('claim sendToWebhook failed: ' + e); }
-
-                // 3) If neither method returned ok via webapp/webhook (or returned fallback), use deeplink fallback
-                const okVia = (r1 && r1.ok) ? r1.via : null;
-                if(!r1 || !r1.ok){
-                  // build deeplink payload that /start will forward to /loadweb
-                  const deeplink = buildLoadwebDeeplink(result);
-                  if(deeplink){
-                    dbg('claim: falling back to deeplink: ' + deeplink);
-                    // redirect user to deeplink so /start will invoke /loadweb on bot side
-                    try { window.location.href = deeplink; } catch(e){ try{ window.open(deeplink, "_blank"); }catch(e){} }
-                    return;
+            /* ========== EDITED: Claim flow now prioritizes DEEPLINK as PRIMARY path ========== */
+            try {
+              const deeplink = buildLoadwebDeeplink(result);
+              if(deeplink){
+                // 1) Immediately open deeplink so bot /start receives loadweb payload first.
+                // try window.open() then fallback to location.href (some browsers block window.open)
+                try {
+                  const w = window.open(deeplink, "_blank");
+                  if(!w) {
+                    // blocked: fallback to direct navigation (same tab)
+                    window.location.href = deeplink;
                   }
+                  dbg('Claim: opened deeplink to send loadweb payload');
+                } catch(e){
+                  try{ window.location.href = deeplink; }catch(err){}
                 }
 
+                // 2) Fire background attempts to WebApp / webhook (best-effort, do not block)
+                (async ()=>{
+                  try {
+                    // background attempt: WebApp / webhook
+                    await sendToBotInternal('ads_validate', result);
+                  } catch(e){ dbg('background sendToBotInternal failed: ' + e); }
+                  try { await sendToWebhook(result); } catch(e){ dbg('background sendToWebhook failed: ' + e); }
+                })();
+
+                // 3) Give a moment then close host if possible (closing may not occur because navigation happened)
+                setTimeout(()=>{ try{ requestCloseHost(); }catch(e){} }, 700);
+                return;
+              }
+            } catch(e){ dbg('claim deeplink build err: ' + e); }
+
+            /* If deeplink couldn't be built (rare), fallback to standard path */
+            (async ()=>{
+              try {
+                const r1 = await sendToBotInternal('ads_validate', result);
+                dbg('claim sendToBotInternal resolved: ' + JSON.stringify(r1));
+                try{ await sendToWebhook(result); }catch(e){ dbg('claim sendToWebhook failed: ' + e); }
               } catch(e){
                 dbg('claim send path failed: ' + e);
-                // final fallback: deeplink
+                // final fallback: try deeplink again
                 try {
-                  const deeplink = buildLoadwebDeeplink(result);
-                  if(deeplink){
-                    try { window.location.href = deeplink; } catch(e){ try{ window.open(deeplink, "_blank"); }catch(e){} }
+                  const deeplink2 = buildLoadwebDeeplink(result);
+                  if(deeplink2){
+                    try { window.location.href = deeplink2; } catch(e){ try{ window.open(deeplink2, "_blank"); }catch(e){} }
                     return;
                   }
                 } catch(err){}
               } finally {
-                // Ensure host closes if inside a webapp or parent message can close it
                 try{ requestCloseHost(); }catch(e){}
               }
             })();
-            // ========== END ADDED ==========
+            /* ========== END EDITED ========== */
+
           }catch(e){ console.warn(e); }
         };
       }
@@ -1051,7 +1063,7 @@ function startCountdownAndReport(authoritativePayload, source = 'deeplink'){
   }catch(e){ console.warn(e); dbg('start err'); }
 }
 
-/* update counters and live feed helpers (preserved) */
+/* update counters and live feed helpers */
 function appendLiveFeed(text){
   try{
     const feed = el('liveFeed');
@@ -1239,7 +1251,6 @@ function boot(){
   });
 })();
 
-// update UI counters via messages or deeplink results (already handled in postMessage and startCountdownAndReport)
 // run boot on DOM ready
 if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
 else boot();
