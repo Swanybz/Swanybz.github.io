@@ -667,6 +667,18 @@ function hideClaimButton(){ try{ const btn = el('claimBtnHosted'); if(btn){ btn.
 
 /* ========== EDITED: Deeplink helpers & send functions (kept & improved) ========== */
 
+/* NEW: URL-safe base64 helper (added) */
+function toBase64UrlSafe(obj) {
+  try {
+    const json = (typeof obj === 'string') ? obj : JSON.stringify(obj);
+    const b64 = btoa(unescape(encodeURIComponent(json)));
+    return b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  } catch (e) {
+    dbg('toBase64UrlSafe error: ' + e);
+    return '';
+  }
+}
+
 function getBotUsernameFromQs(){
   try{
     const qp = (function(){
@@ -681,18 +693,21 @@ function getBotUsernameFromQs(){
   }catch(e){ return FALLBACK_BOT_USERNAME; }
 }
 
-/* builds deeplink for /start=loadweb<base64> — matches your /start processing */
+/* builds deeplink for /start=loadweb<base64> — matches your /start processing
+   REPLACED: now uses URL-safe base64 and consistent 'loadweb' prefix */
 function buildLoadwebDeeplink(payloadObj){
   try{
-    const body = JSON.stringify(payloadObj);
-    const b64 = btoa(body).replace(/=+$/,''); // standard base64
     const botUser = getBotUsernameFromQs();
-    const deeplink = "https://t.me/" + encodeURIComponent(botUser) + "?start=loadweb" + encodeURIComponent(b64);
+    const safe = toBase64UrlSafe(payloadObj);
+    if(!safe) return null;
+    const startParam = 'loadweb' + safe;
+    const deeplink = "https://t.me/" + encodeURIComponent(botUser) + "?start=" + encodeURIComponent(startParam);
     return deeplink;
   }catch(e){ dbg('buildLoadwebDeeplink err: ' + e); return null; }
 }
 
-/* sendToBotInternal tries multiple pathways (WebApp → webhook candidates → BOT_WEBHOOK → deeplink → clipboard) */
+/* sendToBotInternal tries multiple pathways (WebApp → webhook candidates → BOT_WEBHOOK → deeplink → clipboard)
+   REPLACED: uses unified buildLoadwebDeeplink for deeplink path and robust navigation fallbacks */
 async function sendToBotInternal(action, payload){
   const data = { action: action, payload: payload || {}, meta: { from_hosted: true, ts: Date.now(), host: location.href } };
 
@@ -740,13 +755,39 @@ async function sendToBotInternal(action, payload){
     if(res && res.ok){ dbg('sendToBotInternal: posted to BOT_WEBHOOK'); return { ok:true, via:'bot_webhook' }; }
   } catch(e){ dbg('sendToBotInternal: BOT_WEBHOOK post failed'); }
 
-  // 4) Deeplink to bot (final attempt)
+  // 4) Deeplink to bot (final attempt) - use unified builder
   try {
-    const botUser = getBotUsernameFromQs();
-    const encoded = btoa(JSON.stringify(data)).replace(/=+$/,'');
-    const url = "https://t.me/" + encodeURIComponent(botUser) + "?start=" + encodeURIComponent(encoded);
-    try { window.open(url, "_blank"); dbg('sendToBotInternal: opened deeplink to ' + botUser); return { ok:true, via:'deeplink', url: url }; } catch(e){ dbg('sendToBotInternal deeplink open failed'); }
-  } catch(e){ dbg('sendToBotInternal deeplink err'); }
+    const deeplink = buildLoadwebDeeplink(data);
+    if(deeplink){
+      dbg('sendToBotInternal: trying deeplink ' + deeplink);
+      // Try top-level navigation first (works if page is in an iframe/webview)
+      try {
+        if(window.top && window.top.location) {
+          window.top.location.href = deeplink;
+        } else {
+          window.location.href = deeplink;
+        }
+        return { ok:true, via:'deeplink', url: deeplink };
+      } catch(e){
+        // If that is blocked, try a programmatic anchor click fallback and window.open
+        try {
+          const a = document.createElement('a');
+          a.href = deeplink;
+          a.target = '_blank';
+          a.rel = 'noopener noreferrer';
+          a.style.display = 'none';
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          try { window.open(deeplink, "_blank"); }catch(_){} // best-effort
+          dbg('sendToBotInternal: deeplink via anchor click/window.open attempted');
+          return { ok:true, via:'deeplink_anchor', url: deeplink };
+        } catch(inner){
+          dbg('sendToBotInternal deeplink open failed: ' + inner);
+        }
+      }
+    }
+  } catch(e){ dbg('sendToBotInternal deeplink err: ' + e); }
 
   // 5) Clipboard fallback
   try {
