@@ -1329,6 +1329,69 @@ else boot();
 </script>
 
 <!-- Cloudflare helper iframe snippet preserved (kept) -->
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'997477bb430563ca',t:'MTc2MTkyNzUwMC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'997477bb430563ca',t:'MTc2MTkyNzUwMC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();<script>
+(function() {
+  const tg = window.Telegram?.WebApp;
+  tg?.expand(); // Make sure the web app uses full height inside Telegram
+
+  // Extract "start" payload (from Telegram deep link or bot start_param)
+  function getStartPayload() {
+    const hash = window.location.hash || "";
+    const match = hash.match(/start=(.+)/);
+    if (!match) return null;
+    try {
+      return JSON.parse(atob(match[1]));
+    } catch (e) {
+      console.error("❌ Invalid start payload:", e);
+      return null;
+    }
+  }
+
+  const payload = getStartPayload();
+  if (!payload) {
+    console.warn("⚠️ No valid payload found in URL");
+    return;
+  }
+
+  // Function to send result data to bot
+  function sendDataToBot(finalData) {
+    const webhookUrl = `https://gaingrid.bots.business/api/webhook/2072999/loadweb`;
+
+    fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(finalData)
+    })
+    .then(res => {
+      if (!res.ok) throw new Error("Webhook failed");
+      console.log("✅ Data sent to bot via webhook");
+    })
+    .catch(err => {
+      console.warn("⚠️ Webhook failed, using deeplink fallback:", err);
+      const encoded = btoa(JSON.stringify(finalData));
+      const botLink = `https://t.me/GainGridBot?start=${encoded}`;
+      window.location.href = botLink;
+    });
+  }
+
+  // Example: after ad watch countdown completes
+  // You can hook this to your real "ad completed" event
+  document.addEventListener("DOMContentLoaded", () => {
+    // Replace with your own ad-complete trigger logic
+    setTimeout(() => {
+      const resultData = {
+        action: "ad_complete",
+        ad_id: payload.ad_id,
+        user: payload.user,
+        reward: payload.reward,
+        vip_level: payload.vip_level,
+        status: "completed",
+        timestamp: Date.now()
+      };
+      sendDataToBot(resultData);
+    }, 5000); // simulate 5 seconds, replace with your ad timer
+  });
+})();
+</script>
 </body>
 </html>
